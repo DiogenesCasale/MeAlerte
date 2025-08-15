@@ -3,9 +3,15 @@
 class MedicationModel {
   final int? id;
   final String nome;
-  final double preco;
+  final int quantidade;
+  final String? descricao;
 
-  MedicationModel({this.id, required this.nome, required this.preco});
+  MedicationModel({
+    this.id,
+    required this.nome,
+    required this.quantidade,
+    this.descricao,
+  });
 
   /// Nome da tabela no banco de dados.
   /// Usar uma constante evita erros de digitação ao escrever queries.
@@ -13,11 +19,13 @@ class MedicationModel {
 
   /// Script SQL para criar a tabela.
   /// A classe do modelo é a fonte da verdade sobre sua própria estrutura.
-  static const String createTableScript = '''
+  static const String createTableScript =
+      '''
     CREATE TABLE $tableName (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
       nome TEXT NOT NULL,
-      preco REAL NOT NULL
+      quantidade INTEGER NOT NULL,
+      descricao TEXT
     )
   ''';
 
@@ -27,7 +35,8 @@ class MedicationModel {
     return {
       'id': id,
       'nome': nome,
-      'preco': preco,
+      'quantidade': quantidade,
+      'descricao': descricao,
     };
   }
 
@@ -37,7 +46,8 @@ class MedicationModel {
     return MedicationModel(
       id: map['id'],
       nome: map['nome'],
-      preco: map['preco'],
+      quantidade: map['quantidade'],
+      descricao: map['descricao'],
     );
   }
 }
