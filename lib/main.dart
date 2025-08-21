@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:app_remedio/views/home_screen.dart';
 import 'package:app_remedio/utils/constants.dart';
 
+// import da tela de listagem temporariamente
+import 'package:app_remedio/views/medication_list_screen.dart';
+
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const MeAlerteApp());
@@ -34,7 +37,7 @@ class MeAlerteApp extends StatelessWidget {
           foregroundColor: Colors.white,
         ),
       ),
-      home: const HomeScreen(),
+      home: const MedicationListScreen(),
     );
   }
 }
