@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:app_remedio/controllers/medication_controller.dart';
-import 'package:app_remedio/models/treatment_model.dart';
+import 'package:app_remedio/controllers/theme_controller.dart';
+import 'package:app_remedio/models/scheduled_medication_model.dart';
 import 'package:app_remedio/views/add_medication_screen.dart';
 import 'package:app_remedio/utils/constants.dart';
 import 'package:app_remedio/widgets/expandable_fab_widget.dart';
@@ -11,60 +12,68 @@ import 'package:intl/intl.dart';
 class MedicationListScreen extends GetView<MedicationController> {
   const MedicationListScreen({super.key});
 
-  // NOVO: Método para exibir o BottomSheet com as opções de adição
-  void _showAddOptionsModal(BuildContext context) {
-    Get.bottomSheet(
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-          ),
-        ),
-        child: Wrap(
-          spacing: 8.0,
-          runSpacing: 8.0,
-          children: <Widget>[
-            ListTile(
-              leading: const Icon(Icons.medication_outlined, color: primaryColor),
-              title: const Text('Novo Tratamento'),
-              subtitle: const Text('Cadastrar um novo medicamento e agendamento.'),
-              onTap: () {
-                Get.back(); // Fecha o bottom sheet
-                Get.to(() => const AddMedicationScreen());
-              },
-            ),
-            // --- Espaço para futuras opções ---
-            // ListTile(
-            //   leading: const Icon(Icons.inventory_2_outlined, color: primaryColor),
-            //   title: const Text('Nova Reposição de Estoque'),
-            //   onTap: () { /* Navegar para tela de reposição */ },
-            // ),
-            // ListTile(
-            //   leading: const Icon(Icons.event_available_outlined, color: primaryColor),
-            //   title: const Text('Agendar Consulta'),
-            //   onTap: () { /* Navegar para tela de consultas */ },
-            // ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     Get.put(MedicationController());
+    final ThemeController themeController = Get.find();
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Agendamentos de Hoje'), centerTitle: true),
+    return Obx(() => Scaffold(
+      backgroundColor: scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: Text('Agendamentos de Hoje', style: heading2Style),
+        backgroundColor: backgroundColor,
+        foregroundColor: textColor,
+        centerTitle: true,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: Icon(
+              themeController.isDarkMode.value ? Icons.light_mode : Icons.dark_mode,
+              color: textColor,
+            ),
+            onPressed: () => themeController.toggleTheme(),
+            tooltip: themeController.isDarkMode.value ? 'Tema Claro' : 'Tema Escuro',
+          ),
+        ],
+      ),
       body: Obx(() {
         if (controller.isLoading.value) {
-          return const Center(child: CircularProgressIndicator());
+          return Center(
+            child: CircularProgressIndicator(
+              color: primaryColor,
+            ),
+          );
         }
         if (controller.groupedDoses.isEmpty) {
-          return const Center(child: Text("Nenhum agendamento para hoje."));
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.medication_outlined,
+                  size: 64,
+                  color: textColor.withValues(alpha: 0.5),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  "Nenhum agendamento para hoje.",
+                  style: bodyTextStyle.copyWith(
+                    color: textColor.withValues(alpha: 0.7),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                                 ElevatedButton.icon(
+                   onPressed: () => Get.to(() => const AddMedicationScreen()),
+                   icon: Icon(Icons.add, color: Colors.white),
+                   label: Text('Agendar Medicamento', style: TextStyle(color: Colors.white)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ],
+            ),
+          );
         }
 
         final timeKeys = controller.groupedDoses.keys.toList();
@@ -81,53 +90,59 @@ class MedicationListScreen extends GetView<MedicationController> {
       floatingActionButton: ExpandableFab(
         distance: 80.0,
         children: [
-          ActionButtonModel(
-            onPressed: () => Get.to(() => const AddMedicationScreen()),
-            icon: const Icon(Icons.medication_outlined, color: Colors.white),
-            label: 'Novo Tratamento',
-            backgroundColor: primaryColor,
-          ),
-          // Adicione futuras ações aqui. Exemplo:
-          // ActionButtonModel(
-          //   onPressed: () => print('Reposição'),
-          //   icon: const Icon(Icons.inventory_2_outlined, color: Colors.white),
-          //   label: 'Reposição',
-          //   backgroundColor: Colors.orange,
-          // ),
+                        ActionButtonModel(
+                onPressed: () => Get.to(() => const AddMedicationScreen()),
+                icon: Icon(Icons.medication_outlined, color: Colors.white),
+                label: 'Novo Agendamento',
+                backgroundColor: primaryColor,
+              ),
         ],
       ),
-    );
+    ));
   }
 
-  void _showDoseDetailsModal(BuildContext context, ScheduledDose dose) {
+  void _showDoseDetailsModal(BuildContext context, TodayDose dose) {
     showModalBottomSheet(
       context: context,
+      backgroundColor: surfaceColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (ctx) => Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Handle visual do modal
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: textColor.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
             Text(dose.medicationName, style: heading1Style),
             const SizedBox(height: 8),
-            Text('Dose: ${dose.dose}', style: bodyTextStyle),
+            Text('Dose: ${dose.dose % 1 == 0 ? dose.dose.toInt().toString() : dose.dose.toString()}', style: bodyTextStyle),
             Text('Horário: ${DateFormat('HH:mm').format(dose.scheduledTime)}', style: bodyTextStyle),
+            if (dose.observacao != null && dose.observacao!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text('Observações: ${dose.observacao}', style: bodyTextStyle),
+            ],
             const SizedBox(height: 24),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.check),
-              label: const Text('Marcar como Tomado'),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-              onPressed: dose.isTaken ? null : () {
-                controller.markDoseAsTaken(dose.treatmentId, dose.scheduledTime);
-                Get.back();
-              },
-            ),
-            const SizedBox(height: 8),
             OutlinedButton.icon(
-              icon: const Icon(Icons.edit),
-              label: const Text('Editar Tratamento'),
+              icon: Icon(Icons.edit, color: primaryColor),
+              label: Text('Editar Agendamento', style: TextStyle(color: primaryColor)),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: primaryColor),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
               onPressed: () {
                 Get.back();
+                // TODO: Implementar edição
                 Get.snackbar('Em Breve', 'Funcionalidade de edição será implementada.');
               },
             ),
@@ -137,44 +152,137 @@ class MedicationListScreen extends GetView<MedicationController> {
     );
   }
 
-  Widget _buildTimeGroup(String time, List<ScheduledDose> doses) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 24.0),
+  Widget _buildTimeGroup(String time, List<TodayDose> doses) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24.0),
+      decoration: BoxDecoration(
+        color: surfaceColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: textColor.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(time, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: primaryColor)),
-          const SizedBox(height: 8),
-          ...doses.map((dose) => _buildMedicationCard(dose)).toList(),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: primaryColor.withValues(alpha: 0.1),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+              ),
+            ),
+            child: Text(
+              time,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: primaryColor,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Column(
+              children: doses.map((dose) => _buildMedicationCard(dose)).toList(),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildMedicationCard(ScheduledDose dose) {
-    return Card(
-      color: dose.isTaken ? Colors.grey[300] : Colors.white,
+  Widget _buildMedicationCard(TodayDose dose) {
+    return Container(
       margin: const EdgeInsets.only(bottom: 8.0),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: textColor.withValues(alpha: 0.1),
+          width: 1,
+        ),
+      ),
       child: InkWell(
         onTap: () => _showDoseDetailsModal(Get.context!, dose),
-        borderRadius: BorderRadius.circular(12.0),
+        borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Row(
             children: [
+              Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: primaryColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       dose.medicationName,
-                      style: TextStyle(decoration: dose.isTaken ? TextDecoration.lineThrough : null),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: textColor,
+                      ),
                     ),
-                    Text(dose.dose, style: subtitleTextStyle),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Text(
+                          'Dose: ${dose.dose % 1 == 0 ? dose.dose.toInt().toString() : dose.dose.toString()}',
+                          style: subtitleTextStyle,
+                        ),
+                        if (dose.observacao != null && dose.observacao!.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          Icon(
+                            Icons.info_outline,
+                            size: 14,
+                            color: textColor.withValues(alpha: 0.6),
+                          ),
+                        ],
+                      ],
+                    ),
+                    if (dose.observacao != null && dose.observacao!.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        dose.observacao!,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: textColor.withValues(alpha: 0.6),
+                          fontStyle: FontStyle.italic,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ],
                 ),
               ),
-              if (dose.isTaken) const Icon(Icons.check_circle, color: Colors.green),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: primaryColor.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.chevron_right,
+                  color: primaryColor,
+                  size: 16,
+                ),
+              ),
             ],
           ),
         ),

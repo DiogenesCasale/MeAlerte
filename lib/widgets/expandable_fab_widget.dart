@@ -84,8 +84,8 @@ class _ExpandableFabState extends State<ExpandableFab> with SingleTickerProvider
           elevation: 4.0,
           child: InkWell(
             onTap: _toggle,
-            child: const Padding(
-              padding: EdgeInsets.all(8.0),
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
               child: Icon(Icons.close, color: primaryColor),
             ),
           ),

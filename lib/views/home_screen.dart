@@ -1,25 +1,39 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:app_remedio/views/add_medication_screen.dart';
 import 'package:app_remedio/views/medication_list_screen.dart';
 import 'package:app_remedio/utils/constants.dart';
+import 'package:app_remedio/controllers/theme_controller.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: backgroundColor,
+    final ThemeController themeController = Get.find();
+    
+    return Obx(() => Scaffold(
+      backgroundColor: scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Bem-vindo, novamente!'),
+        title: Text('Bem-vindo, novamente!', style: heading2Style),
         backgroundColor: backgroundColor,
         foregroundColor: textColor,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: Icon(
+              themeController.isDarkMode.value ? Icons.light_mode : Icons.dark_mode,
+              color: textColor,
+            ),
+            onPressed: () => themeController.toggleTheme(),
+            tooltip: themeController.isDarkMode.value ? 'Tema Claro' : 'Tema Escuro',
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
-          const Text('Acesso rápido', style: heading2Style),
+          Text('Acesso rápido', style: heading2Style),
           const SizedBox(height: 10),
           Row(
             children: [
@@ -29,14 +43,14 @@ class HomeScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 30),
-          const Text('Resumo dos últimos 30 dias', style: heading2Style),
+          Text('Resumo dos últimos 30 dias', style: heading2Style),
           const SizedBox(height: 10),
-          _buildSummaryCard('Medicamentos tomados', '50', Colors.blue),
-          _buildSummaryCard('Reposições feitas', '100', Colors.green),
-          _buildSummaryCard('Consultas realizadas', '10', Colors.orange),
+          _buildSummaryCard('Medicamentos agendados', '12', primaryColor),
+          _buildSummaryCard('Medicamentos cadastrados', '8', toastSuccessColor),
+          _buildSummaryCard('Agendamentos ativos', '5', toastInfoColor),
         ],
       ),
-    );
+    ));
   }
 
   Widget _buildQuickAccessCard(BuildContext context, String title, IconData icon, Widget screen) {
@@ -47,6 +61,13 @@ class HomeScreen extends StatelessWidget {
         decoration: BoxDecoration(
           color: primaryColor,
           borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: primaryColor.withValues(alpha: 0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Column(
           children: [
@@ -62,7 +83,9 @@ class HomeScreen extends StatelessWidget {
   Widget _buildSummaryCard(String title, String value, Color color) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      color: surfaceColor,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      elevation: 2,
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Row(

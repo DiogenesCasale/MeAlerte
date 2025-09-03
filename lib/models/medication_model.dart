@@ -1,14 +1,16 @@
 class Medication {
   final int? id;
   final String nome;
-  final int quantidadeEstoque;
+  final int quantidade;
   final String? observacao;
+  final String? dataCriacao;
 
   Medication({
     this.id,
     required this.nome,
-    required this.quantidadeEstoque,
+    required this.quantidade,
     this.observacao,
+    this.dataCriacao,
   });
 
   // Construtor para ler dados do banco
@@ -16,8 +18,9 @@ class Medication {
     return Medication(
       id: map['id'],
       nome: map['nome'],
-      quantidadeEstoque: map['quantidade_estoque'],
+      quantidade: map['quantidade'],
       observacao: map['observacao'],
+      dataCriacao: map['data_criacao'],
     );
   }
 
@@ -25,8 +28,9 @@ class Medication {
     return {
       'id': id,
       'nome': nome,
-      'quantidade_estoque': quantidadeEstoque,
+      'quantidade': quantidade,
       'observacao': observacao,
+      'data_criacao': dataCriacao ?? DateTime.now().toIso8601String(),
     };
   }
 
@@ -34,8 +38,9 @@ class Medication {
     return Medication(
       id: id ?? this.id,
       nome: nome,
-      quantidadeEstoque: quantidadeEstoque,
+      quantidade: quantidade,
       observacao: observacao,
+      dataCriacao: dataCriacao,
     );
   }
 }

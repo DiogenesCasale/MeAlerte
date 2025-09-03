@@ -1,7 +1,7 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:app_remedio/models/medication_model.dart';
-import 'package:app_remedio/models/treatment_model.dart';
+import 'package:app_remedio/models/scheduled_medication_model.dart';
 import 'package:intl/intl.dart';
 
 class DatabaseController {
@@ -11,7 +11,7 @@ class DatabaseController {
 
   Future<Database> get database async {
     if (_database != null) return _database!;
-    _database = await _initDB('app_remedio_v2.db');
+    _database = await _initDB('app_remedio_v4.db');
     return _database!;
   }
 
@@ -22,135 +22,152 @@ class DatabaseController {
   }
 
   Future _createDB(Database db, int version) async {
-    // Tabela de catálogo de medicamentos (estoque)
+    // Tabela de medicamentos conforme documentação
     await db.execute('''
-      CREATE TABLE medicamentos ( 
+      CREATE TABLE tblMedicamentos ( 
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
-        nome TEXT NOT NULL UNIQUE,
-        quantidade_estoque INTEGER NOT NULL,
-        observacao TEXT
+        nome TEXT NOT NULL,
+        quantidade INTEGER NOT NULL CHECK(quantidade >= 0),
+        observacao TEXT,
+        data_criacao TEXT NOT NULL
       )
     ''');
 
-    // Tabela com as prescrições de tratamento
+    // Tabela de medicamentos agendados conforme documentação
     await db.execute('''
-      CREATE TABLE tratamentos (
+      CREATE TABLE tblMedicamentosAgendados (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        hora TEXT NOT NULL,
+        dose REAL NOT NULL CHECK(dose > 0),
+        intervalo INTEGER NOT NULL,
+        dias INTEGER NOT NULL CHECK(dias >= 0),
+        observacao TEXT,
         medicamento_id INTEGER NOT NULL,
-        dose TEXT NOT NULL,
-        data_hora_inicio TEXT NOT NULL,
-        intervalo_horas INTEGER NOT NULL,
-        duracao_dias INTEGER NOT NULL,
-        FOREIGN KEY (medicamento_id) REFERENCES medicamentos (id) ON DELETE CASCADE
-      )
-    ''');
-
-    // Tabela para registrar o histórico de doses tomadas
-    await db.execute('''
-      CREATE TABLE doses_historico (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        tratamento_id INTEGER NOT NULL,
-        horario_previsto TEXT NOT NULL,
-        horario_real_tomado TEXT NOT NULL,
-        status TEXT NOT NULL, 
-        FOREIGN KEY (tratamento_id) REFERENCES tratamentos (id) ON DELETE CASCADE
+        data_criacao TEXT NOT NULL,
+        FOREIGN KEY (medicamento_id) REFERENCES tblMedicamentos (id) ON DELETE CASCADE
       )
     ''');
   }
 
-  // --- MÉTODOS PARA MEDICAMENTOS (ESTOQUE) ---
+  // --- MÉTODOS PARA MEDICAMENTOS ---
   Future<Medication> createMedication(Medication medication) async {
     final db = await instance.database;
-    final id = await db.insert('medicamentos', medication.toMap());
+    final id = await db.insert('tblMedicamentos', medication.toMap());
     return medication.copyWith(id: id);
   }
 
   Future<List<Medication>> getAllMedications() async {
     final db = await instance.database;
-    final result = await db.query('medicamentos', orderBy: 'nome ASC');
+    final result = await db.query('tblMedicamentos', orderBy: 'nome ASC');
     return result.map((json) => Medication.fromMap(json)).toList();
   }
 
-  // --- MÉTODOS PARA TRATAMENTOS ---
-  Future<Treatment> createTreatment(Treatment treatment) async {
+  Future<List<Medication>> searchMedications(String query) async {
     final db = await instance.database;
-    final id = await db.insert('tratamentos', treatment.toMap());
-    return treatment.copyWith(id: id);
+    final result = await db.query(
+      'tblMedicamentos',
+      where: 'nome LIKE ?',
+      whereArgs: ['%$query%'],
+      orderBy: 'nome ASC',
+    );
+    return result.map((json) => Medication.fromMap(json)).toList();
   }
-  
-  // --- MÉTODOS PARA HISTÓRICO DE DOSES ---
-  Future<void> markDoseAsTaken(int treatmentId, DateTime scheduledTime) async {
+
+  // --- MÉTODOS PARA MEDICAMENTOS AGENDADOS ---
+  Future<ScheduledMedication> createScheduledMedication(ScheduledMedication scheduledMedication) async {
     final db = await instance.database;
-    await db.insert('doses_historico', {
-      'tratamento_id': treatmentId,
-      'horario_previsto': scheduledTime.toIso8601String(),
-      'horario_real_tomado': DateTime.now().toIso8601String(),
-      'status': 'TOMADO'
-    });
+    final id = await db.insert('tblMedicamentosAgendados', scheduledMedication.toMap());
+    return scheduledMedication.copyWith(id: id);
   }
 
-  Future<Set<String>> getTakenDosesForToday() async {
-      final db = await instance.database;
-      final now = DateTime.now();
-      final todayStart = DateTime(now.year, now.month, now.day).toIso8601String();
-      final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59).toIso8601String();
-
-      final result = await db.query(
-          'doses_historico',
-          where: 'horario_previsto >= ? AND horario_previsto <= ?',
-          whereArgs: [todayStart, todayEnd]
-      );
-
-      // Cria um conjunto de chaves únicas para fácil verificação (ex: "1_2025-08-20T14:00:00.000")
-      return result.map((row) => '${row['tratamento_id']}_${row['horario_previsto']}').toSet();
+  Future<void> updateScheduledMedication(ScheduledMedication scheduledMedication) async {
+    final db = await instance.database;
+    await db.update(
+      'tblMedicamentosAgendados',
+      scheduledMedication.toMap(),
+      where: 'id = ?',
+      whereArgs: [scheduledMedication.id],
+    );
   }
 
+  Future<void> deleteScheduledMedication(int id) async {
+    final db = await instance.database;
+    await db.delete(
+      'tblMedicamentosAgendados',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
 
-  // LÓGICA PRINCIPAL: Gera as doses do dia e agrupa por horário
-  Future<Map<String, List<ScheduledDose>>> getGroupedScheduledDosesForToday() async {
-    final now = DateTime.now();
-    final todayStart = DateTime(now.year, now.month, now.day);
-    final todayEnd = todayStart.add(const Duration(days: 1));
-
+  Future<List<ScheduledMedication>> getAllScheduledMedications() async {
     final db = await instance.database;
     final result = await db.rawQuery('''
-      SELECT
-        t.id as treatmentId, t.dose, t.data_hora_inicio, t.intervalo_horas, t.duracao_dias,
+      SELECT 
+        s.id, s.hora, s.dose, s.intervalo, s.dias, s.observacao, s.medicamento_id, s.data_criacao,
         m.nome as medicationName
-      FROM tratamentos t
-      INNER JOIN medicamentos m ON t.medicamento_id = m.id
+      FROM tblMedicamentosAgendados s
+      INNER JOIN tblMedicamentos m ON s.medicamento_id = m.id
+      ORDER BY s.hora ASC
+    ''');
+    return result.map((json) => ScheduledMedication.fromMapWithMedication(json)).toList();
+  }
+
+  // Gera as doses do dia baseado nos medicamentos agendados
+  Future<Map<String, List<TodayDose>>> getTodayDoses() async {
+    final db = await instance.database;
+    final result = await db.rawQuery('''
+      SELECT 
+        s.id, s.hora, s.dose, s.intervalo, s.dias, s.observacao, s.medicamento_id, s.data_criacao,
+        m.nome as medicationName
+      FROM tblMedicamentosAgendados s
+      INNER JOIN tblMedicamentos m ON s.medicamento_id = m.id
     ''');
 
-    final List<Treatment> treatments = result.isNotEmpty 
-        ? result.map((json) => Treatment.fromMapWithMedication(json)).toList() 
+    final List<ScheduledMedication> scheduledMedications = result.isNotEmpty 
+        ? result.map((json) => ScheduledMedication.fromMapWithMedication(json)).toList() 
         : [];
 
-    final takenDoses = await getTakenDosesForToday();
-    final Map<String, List<ScheduledDose>> groupedDoses = {};
+    final Map<String, List<TodayDose>> groupedDoses = {};
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
 
-    for (var treatment in treatments) {
-      final startDate = DateTime.parse(treatment.dataHoraInicio);
-      final endDate = startDate.add(Duration(days: treatment.duracaoDias));
-
-      if (now.isBefore(endDate)) {
-        DateTime currentDoseTime = startDate;
-        while (currentDoseTime.isBefore(endDate)) {
-          if (currentDoseTime.isAfter(todayStart) && currentDoseTime.isBefore(todayEnd)) {
-            final timeKey = DateFormat('HH:mm').format(currentDoseTime);
-            final doseKey = '${treatment.id}_${currentDoseTime.toIso8601String()}';
-
-            final scheduledDose = ScheduledDose(
-              treatmentId: treatment.id!,
-              medicationName: treatment.medicationName!,
-              dose: treatment.dose,
-              scheduledTime: currentDoseTime,
-              isTaken: takenDoses.contains(doseKey),
+    for (var scheduled in scheduledMedications) {
+      if (scheduled.dataCriacao == null) continue;
+      
+      try {
+        final creationDate = DateTime.parse(scheduled.dataCriacao!);
+        final endDate = creationDate.add(Duration(days: scheduled.dias));
+        
+        // Verifica se o medicamento ainda está ativo (dentro do período de dias)
+        if (now.isBefore(endDate)) {
+          // Parse da hora inicial
+          final timeParts = scheduled.hora.split(':');
+          final hour = int.parse(timeParts[0]);
+          final minute = int.parse(timeParts[1]);
+          
+          // Calcula todas as doses do dia baseado no intervalo
+          DateTime doseTime = today.add(Duration(hours: hour, minutes: minute));
+          
+          while (doseTime.day == today.day) {
+            final timeKey = DateFormat('HH:mm').format(doseTime);
+            
+            final todayDose = TodayDose(
+              scheduledMedicationId: scheduled.id!,
+              medicationName: scheduled.medicationName!,
+              dose: scheduled.dose,
+              scheduledTime: doseTime,
+              observacao: scheduled.observacao,
             );
 
-            groupedDoses.putIfAbsent(timeKey, () => []).add(scheduledDose);
+            groupedDoses.putIfAbsent(timeKey, () => []).add(todayDose);
+            
+            // Próxima dose
+            doseTime = doseTime.add(Duration(hours: scheduled.intervalo));
           }
-          currentDoseTime = currentDoseTime.add(Duration(hours: treatment.intervaloHoras));
         }
+      } catch (e) {
+        print('Erro ao processar medicamento agendado ${scheduled.id}: $e');
+        continue;
       }
     }
     
