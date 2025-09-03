@@ -2,11 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:app_remedio/views/medication_list_screen.dart';
+import 'package:app_remedio/views/main_layout.dart';
 import 'package:app_remedio/controllers/theme_controller.dart';
 import 'package:app_remedio/controllers/medication_controller.dart';
 import 'package:app_remedio/utils/constants.dart';
-
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   
@@ -98,7 +97,7 @@ class _SplashScreenState extends State<SplashScreen>
     _animationController.forward();
     
     Timer(const Duration(seconds: 3), () {
-      Get.off(() => const MedicationListScreen(),
+      Get.off(() => const MainLayout(),
           transition: Transition.fadeIn,
           duration: const Duration(milliseconds: 500));
     });
@@ -130,7 +129,6 @@ class _SplashScreenState extends State<SplashScreen>
                       width: 120,
                       height: 120,
                       decoration: BoxDecoration(
-                        color: primaryColor,
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
@@ -140,10 +138,14 @@ class _SplashScreenState extends State<SplashScreen>
                           ),
                         ],
                       ),
-                      child: const Icon(
-                        Icons.medication,
-                        size: 60,
-                        color: Colors.white,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: Image.asset(
+                          'assets/images/logo.png',
+                          width: 120,
+                          height: 120,
+                          fit: BoxFit.cover,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 24),

@@ -430,7 +430,7 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
                 ),
                 const SizedBox(height: 20),
                 
-                _buildTimePicker('Hora Início *', _selectedTime.format(context), _selectTime),
+                _buildTimePicker('Hora Início *', '${_selectedTime.hour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')}', _selectTime),
                 const SizedBox(height: 20),
                 
                 Row(
@@ -506,14 +506,42 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
       context: context, 
       initialTime: _selectedTime,
       builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: primaryColor,
-              surface: surfaceColor,
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              timePickerTheme: TimePickerThemeData(
+                backgroundColor: surfaceColor,
+                hourMinuteTextColor: textColor,
+                dialHandColor: primaryColor,
+                dialBackgroundColor: surfaceColor,
+                dialTextColor: textColor,
+                entryModeIconColor: textColor,
+                dayPeriodTextColor: textColor,
+                dayPeriodColor: surfaceColor,
+                dayPeriodBorderSide: BorderSide(color: textColor.withValues(alpha: 0.3)),
+                helpTextStyle: TextStyle(color: textColor),
+                hourMinuteTextStyle: TextStyle(color: textColor, fontSize: 24),
+                inputDecorationTheme: InputDecorationTheme(
+                  fillColor: surfaceColor,
+                  filled: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: textColor.withValues(alpha: 0.3)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: textColor.withValues(alpha: 0.3)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: primaryColor),
+                  ),
+                ),
+              ),
             ),
+            child: child!,
           ),
-          child: child!,
         );
       },
     );

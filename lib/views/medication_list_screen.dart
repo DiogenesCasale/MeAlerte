@@ -4,50 +4,61 @@ import 'package:app_remedio/controllers/medication_controller.dart';
 import 'package:app_remedio/controllers/theme_controller.dart';
 import 'package:app_remedio/models/scheduled_medication_model.dart';
 import 'package:app_remedio/views/add_medication_screen.dart';
+import 'package:app_remedio/views/edit_medication_screen.dart';
 import 'package:app_remedio/utils/constants.dart';
+import 'package:app_remedio/utils/toast_service.dart';
 import 'package:app_remedio/widgets/expandable_fab_widget.dart';
+import 'package:app_remedio/widgets/date_selector_widget.dart';
 import 'package:app_remedio/models/action_button_model.dart';
 import 'package:intl/intl.dart';
 
 class MedicationListScreen extends GetView<MedicationController> {
-  const MedicationListScreen({super.key});
+  final bool showAppBar;
+  const MedicationListScreen({super.key, this.showAppBar = true});
 
   @override
   Widget build(BuildContext context) {
     Get.put(MedicationController());
     final ThemeController themeController = Get.find();
 
-    return Obx(() => Scaffold(
+    return Scaffold(
       backgroundColor: scaffoldBackgroundColor,
-      appBar: AppBar(
+      appBar: showAppBar ? AppBar(
         title: Text('Agendamentos de Hoje', style: heading2Style),
         backgroundColor: backgroundColor,
         foregroundColor: textColor,
         centerTitle: true,
         elevation: 0,
         actions: [
-          IconButton(
+          Obx(() => IconButton(
             icon: Icon(
               themeController.isDarkMode.value ? Icons.light_mode : Icons.dark_mode,
               color: textColor,
             ),
             onPressed: () => themeController.toggleTheme(),
             tooltip: themeController.isDarkMode.value ? 'Tema Claro' : 'Tema Escuro',
-          ),
+          )),
         ],
-      ),
-      body: Obx(() {
-        if (controller.isLoading.value) {
-          return Center(
-            child: CircularProgressIndicator(
-              color: primaryColor,
-            ),
-          );
-        }
-        if (controller.groupedDoses.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+      ) : null,
+      body: Column(
+        children: [
+          // Barra superior com seleção de dias (só mostra quando não tem AppBar)
+          if (!showAppBar) const DateSelectorWidget(),
+          
+          // Conteúdo principal
+          Expanded(
+            child: Obx(() {
+              if (controller.isLoading.value) {
+                return Center(
+                  child: CircularProgressIndicator(
+                    color: primaryColor,
+                  ),
+                );
+              }
+              if (controller.groupedDoses.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
                   Icons.medication_outlined,
@@ -76,29 +87,32 @@ class MedicationListScreen extends GetView<MedicationController> {
           );
         }
 
-        final timeKeys = controller.groupedDoses.keys.toList();
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: timeKeys.length,
-          itemBuilder: (context, index) {
-            final time = timeKeys[index];
-            final dosesForTime = controller.groupedDoses[time]!;
-            return _buildTimeGroup(time, dosesForTime);
-          },
-        );
-      }),
+              final timeKeys = controller.groupedDoses.keys.toList();
+              return ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: timeKeys.length,
+                itemBuilder: (context, index) {
+                  final time = timeKeys[index];
+                  final dosesForTime = controller.groupedDoses[time]!;
+                  return _buildTimeGroup(time, dosesForTime);
+                },
+              );
+            }),
+          ),
+        ],
+      ),
       floatingActionButton: ExpandableFab(
         distance: 80.0,
         children: [
-                        ActionButtonModel(
-                onPressed: () => Get.to(() => const AddMedicationScreen()),
-                icon: Icon(Icons.medication_outlined, color: Colors.white),
-                label: 'Novo Agendamento',
-                backgroundColor: primaryColor,
-              ),
+          ActionButtonModel(
+            onPressed: () => Get.to(() => const AddMedicationScreen()),
+            icon: Icon(Icons.medication_outlined, color: Colors.white),
+            label: 'Novo Agendamento',
+            backgroundColor: primaryColor,
+          ),
         ],
       ),
-    ));
+    );
   }
 
   void _showDoseDetailsModal(BuildContext context, TodayDose dose) {
@@ -141,9 +155,7 @@ class MedicationListScreen extends GetView<MedicationController> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               onPressed: () {
-                Get.back();
-                // TODO: Implementar edição
-                Get.snackbar('Em Breve', 'Funcionalidade de edição será implementada.');
+                _editMedication(dose);
               },
             ),
           ],
@@ -271,22 +283,135 @@ class MedicationListScreen extends GetView<MedicationController> {
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: primaryColor.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.chevron_right,
-                  color: primaryColor,
-                  size: 16,
-                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Botão check verde
+                  _buildActionButton(
+                    icon: Icons.check,
+                    color: Colors.green,
+                    onTap: () {
+                      _showCheckToast();
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  // Botão editar
+                  _buildActionButton(
+                    icon: Icons.edit,
+                    color: Colors.blue,
+                    onTap: () {
+                      _editMedication(dose);
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  // Botão deletar
+                  _buildActionButton(
+                    icon: Icons.delete,
+                    color: Colors.red,
+                    onTap: () {
+                      _deleteMedication(dose);
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  // Seta para detalhes
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: primaryColor.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.chevron_right,
+                      color: primaryColor,
+                      size: 16,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          icon,
+          color: color,
+          size: 16,
+        ),
+      ),
+    );
+  }
+
+  void _editMedication(TodayDose dose) {
+    Get.to(() => EditMedicationScreen(dose: dose));
+  }
+
+  void _deleteMedication(TodayDose dose) {
+    Get.dialog(
+      AlertDialog(
+        backgroundColor: surfaceColor,
+        title: Text('Confirmar Exclusão', style: heading2Style),
+        content: Text(
+          'Deseja realmente excluir o agendamento de ${dose.medicationName}?',
+          style: bodyTextStyle,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: Text('Cancelar', style: TextStyle(color: textColor.withOpacity(0.6))),
+          ),
+          TextButton(
+            onPressed: () async {
+              try {
+                Get.back(); // Fechar dialog
+                await controller.deleteScheduledMedication(dose.scheduledMedicationId);
+                _showDeleteSuccessToast(dose.medicationName);
+              } catch (e) {
+                print('Erro ao excluir medicamento: $e');
+                _showDeleteErrorToast();
+              }
+            },
+            child: Text('Excluir', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCheckToast() {
+    // Usar o contexto do widget atual que tem overlay
+    final context = Get.overlayContext;
+    if (context != null) {
+      ToastService.showInfo(context, 'Função de marcar como tomado será implementada');
+    }
+  }
+
+  void _showDeleteSuccessToast(String medicationName) {
+    final context = Get.overlayContext;
+    if (context != null) {
+      ToastService.showSuccess(context, '$medicationName foi excluído com sucesso');
+    }
+  }
+
+  void _showDeleteErrorToast() {
+    final context = Get.overlayContext;
+    if (context != null) {
+      ToastService.showError(context, 'Não foi possível excluir o agendamento');
+    }
   }
 }

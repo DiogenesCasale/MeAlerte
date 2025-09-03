@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'package:get/get.dart';
 import 'package:app_remedio/models/action_button_model.dart';
 import 'package:app_remedio/utils/constants.dart';
+import 'package:app_remedio/controllers/theme_controller.dart';
 
 @immutable
 class ExpandableFab extends StatefulWidget {
@@ -74,24 +76,31 @@ class _ExpandableFabState extends State<ExpandableFab> with SingleTickerProvider
   }
 
   Widget _buildTapToCloseFab() {
-    return SizedBox(
-      width: 56.0,
-      height: 56.0,
-      child: Center(
-        child: Material(
-          shape: const CircleBorder(),
-          clipBehavior: Clip.antiAlias,
-          elevation: 4.0,
-          child: InkWell(
-            onTap: _toggle,
-            child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Icon(Icons.close, color: primaryColor),
+    final themeController = Get.find<ThemeController>();
+    return Obx(() {
+      // Forçar rebuild quando tema muda
+      themeController.isDarkMode.value;
+      
+      return SizedBox(
+        width: 56.0,
+        height: 56.0,
+        child: Center(
+          child: Material(
+            color: surfaceColor,
+            shape: const CircleBorder(),
+            clipBehavior: Clip.antiAlias,
+            elevation: 4.0,
+            child: InkWell(
+              onTap: _toggle,
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Icon(Icons.close, color: primaryColor),
+              ),
             ),
           ),
         ),
-      ),
-    );
+      );
+    });
   }
 
   List<Widget> _buildExpandingActionButtons() {
@@ -118,24 +127,32 @@ class _ExpandableFabState extends State<ExpandableFab> with SingleTickerProvider
   }
 
   Widget _buildTapToOpenFab() {
-    return IgnorePointer(
-      ignoring: _open,
-      child: AnimatedContainer(
-        transformAlignment: Alignment.center,
-        transform: Matrix4.diagonal3Values(_open ? 0.7 : 1.0, _open ? 0.7 : 1.0, 1.0),
-        duration: const Duration(milliseconds: 250),
-        curve: const Interval(0.0, 0.5, curve: Curves.easeOut),
-        child: AnimatedOpacity(
-          opacity: _open ? 0.0 : 1.0,
-          curve: const Interval(0.25, 1.0, curve: Curves.easeInOut),
+    final themeController = Get.find<ThemeController>();
+    return Obx(() {
+      // Forçar rebuild quando tema muda
+      themeController.isDarkMode.value;
+      
+      return IgnorePointer(
+        ignoring: _open,
+        child: AnimatedContainer(
+          transformAlignment: Alignment.center,
+          transform: Matrix4.diagonal3Values(_open ? 0.7 : 1.0, _open ? 0.7 : 1.0, 1.0),
           duration: const Duration(milliseconds: 250),
-          child: FloatingActionButton(
-            onPressed: _toggle,
-            child: const Icon(Icons.add),
+          curve: const Interval(0.0, 0.5, curve: Curves.easeOut),
+          child: AnimatedOpacity(
+            opacity: _open ? 0.0 : 1.0,
+            curve: const Interval(0.25, 1.0, curve: Curves.easeInOut),
+            duration: const Duration(milliseconds: 250),
+            child: FloatingActionButton(
+              backgroundColor: primaryColor,
+              foregroundColor: Colors.white,
+              onPressed: _toggle,
+              child: const Icon(Icons.add),
+            ),
           ),
         ),
-      ),
-    );
+      );
+    });
   }
 }
 
@@ -178,16 +195,19 @@ class _ExpandingActionButton extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
                       margin: const EdgeInsets.only(right: 8.0),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: surfaceColor,
                         borderRadius: BorderRadius.circular(4.0),
                         boxShadow: [
                           BoxShadow(
                             blurRadius: 4.0,
-                            color: Colors.black.withOpacity(0.25),
+                            color: Colors.black.withValues(alpha: 0.25),
                           )
                         ],
                       ),
-                      child: Text(child.label!),
+                      child: Text(
+                        child.label!,
+                        style: TextStyle(color: textColor),
+                      ),
                     ),
                   FloatingActionButton.small(
                     heroTag: null,

@@ -1,6 +1,6 @@
 {
-    "name": "app_remedio",
-    "short_name": "app_remedio",
+    "name": "MeAlerte",
+    "short_name": "MeAlerte",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
