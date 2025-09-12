@@ -2,9 +2,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:app_remedio/views/main_layout.dart';
 import 'package:app_remedio/controllers/theme_controller.dart';
 import 'package:app_remedio/controllers/medication_controller.dart';
+import 'package:app_remedio/controllers/schedules_controller.dart';
+import 'package:app_remedio/controllers/profile_controller.dart';
 import 'package:app_remedio/utils/constants.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,8 +19,11 @@ void main() {
   ));
   
   // Inicializa os controllers globais
+  // IMPORTANTE: ProfileController deve ser inicializado PRIMEIRO
   Get.put(ThemeController());
+  Get.put(ProfileController());
   Get.put(MedicationController());
+  Get.put(SchedulesController());
   
   runApp(const MeAlerteApp());
 }
@@ -27,9 +33,20 @@ class MeAlerteApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GetMaterialApp(
+    final themeController = Get.find<ThemeController>();
+    
+    return Obx(() => GetMaterialApp(
       title: 'MeAlerte',
       debugShowCheckedModeBanner: false,
+      locale: const Locale('pt', 'BR'),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('pt', 'BR'),
+      ],
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
@@ -37,6 +54,18 @@ class MeAlerteApp extends StatelessWidget {
           brightness: Brightness.light,
         ),
         fontFamily: 'Inter',
+        timePickerTheme: TimePickerThemeData(
+          backgroundColor: backgroundColorLight,
+          hourMinuteTextColor: textColorLight,
+          dialHandColor: primaryColorLight,
+          dialBackgroundColor: backgroundColorLight,
+          dialTextColor: textColorLight,
+          entryModeIconColor: textColorLight,
+          dayPeriodTextColor: textColorLight,
+          dayPeriodColor: backgroundColorLight,
+          helpTextStyle: TextStyle(color: textColorLight),
+          hourMinuteTextStyle: TextStyle(color: textColorLight, fontSize: 24),
+        ),
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
@@ -45,10 +74,33 @@ class MeAlerteApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
         fontFamily: 'Inter',
+        timePickerTheme: TimePickerThemeData(
+          backgroundColor: backgroundColorDark,
+          hourMinuteTextColor: textColorDark,
+          dialHandColor: primaryColorDark,
+          dialBackgroundColor: backgroundColorDark,
+          dialTextColor: textColorDark,
+          entryModeIconColor: textColorDark,
+          dayPeriodTextColor: textColorDark,
+          dayPeriodColor: backgroundColorDark,
+          helpTextStyle: TextStyle(color: textColorDark),
+          hourMinuteTextStyle: TextStyle(color: textColorDark, fontSize: 24),
+        ),
       ),
-      themeMode: ThemeMode.system,
+      themeMode: _getThemeMode(themeController.themeMode.value),
       home: const SplashScreen(),
-    );
+    ));
+  }
+  
+  ThemeMode _getThemeMode(AppThemeMode mode) {
+    switch (mode) {
+      case AppThemeMode.light:
+        return ThemeMode.light;
+      case AppThemeMode.dark:
+        return ThemeMode.dark;
+      case AppThemeMode.system:
+        return ThemeMode.system;
+    }
   }
 }
 

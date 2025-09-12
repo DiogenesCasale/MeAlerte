@@ -12,11 +12,13 @@ class ExpandableFab extends StatefulWidget {
     this.initialOpen,
     required this.distance,
     required this.children,
+    this.heroTag,
   });
 
   final bool? initialOpen;
   final double distance;
   final List<ActionButtonModel> children;
+  final String? heroTag;
 
   @override
   State<ExpandableFab> createState() => _ExpandableFabState();
@@ -67,7 +69,7 @@ class _ExpandableFabState extends State<ExpandableFab> with SingleTickerProvider
         alignment: Alignment.bottomRight,
         clipBehavior: Clip.none,
         children: [
-          _buildTapToCloseFab(),
+          if (_open) _buildTapToCloseFab(),
           ..._buildExpandingActionButtons(),
           _buildTapToOpenFab(),
         ],
@@ -79,25 +81,17 @@ class _ExpandableFabState extends State<ExpandableFab> with SingleTickerProvider
     final themeController = Get.find<ThemeController>();
     return Obx(() {
       // Forçar rebuild quando tema muda
-      themeController.isDarkMode.value;
+      themeController.isDarkMode;
       
-      return SizedBox(
-        width: 56.0,
-        height: 56.0,
-        child: Center(
-          child: Material(
-            color: surfaceColor,
-            shape: const CircleBorder(),
-            clipBehavior: Clip.antiAlias,
-            elevation: 4.0,
-            child: InkWell(
-              onTap: _toggle,
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Icon(Icons.close, color: primaryColor),
-              ),
-            ),
-          ),
+      return AnimatedOpacity(
+        opacity: _open ? 1.0 : 0.0,
+        duration: const Duration(milliseconds: 250),
+        child: FloatingActionButton(
+          heroTag: widget.heroTag,
+          backgroundColor: surfaceColor,
+          foregroundColor: primaryColor,
+          onPressed: _toggle,
+          child: const Icon(Icons.close),
         ),
       );
     });
@@ -107,7 +101,7 @@ class _ExpandableFabState extends State<ExpandableFab> with SingleTickerProvider
     final children = <Widget>[];
     final count = widget.children.length;
     final step = 90.0 / (count > 1 ? count - 1 : 1);
-    for (var i = 0, angleInDegrees = 90.0; i < count; i++, angleInDegrees += step) {
+    for (var i = 0, angleInDegrees = 90.0; i < count; i++, angleInDegrees -= step) {
       children.add(
         _ExpandingActionButton(
           directionInDegrees: angleInDegrees,
@@ -130,7 +124,7 @@ class _ExpandableFabState extends State<ExpandableFab> with SingleTickerProvider
     final themeController = Get.find<ThemeController>();
     return Obx(() {
       // Forçar rebuild quando tema muda
-      themeController.isDarkMode.value;
+      themeController.isDarkMode;
       
       return IgnorePointer(
         ignoring: _open,
@@ -144,6 +138,7 @@ class _ExpandableFabState extends State<ExpandableFab> with SingleTickerProvider
             curve: const Interval(0.25, 1.0, curve: Curves.easeInOut),
             duration: const Duration(milliseconds: 250),
             child: FloatingActionButton(
+              heroTag: widget.heroTag,
               backgroundColor: primaryColor,
               foregroundColor: Colors.white,
               onPressed: _toggle,
@@ -184,38 +179,58 @@ class _ExpandingActionButton extends StatelessWidget {
         return Positioned(
           right: 4.0 + pos.dx,
           bottom: 4.0 + pos.dy,
-          child: Opacity(
-            opacity: progress.value,
-            child: InkWell(
-              onTap: onTap,
-              child: Row(
-                children: [
-                  if (child.label != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
-                      margin: const EdgeInsets.only(right: 8.0),
-                      decoration: BoxDecoration(
-                        color: surfaceColor,
-                        borderRadius: BorderRadius.circular(4.0),
-                        boxShadow: [
-                          BoxShadow(
-                            blurRadius: 4.0,
-                            color: Colors.black.withValues(alpha: 0.25),
-                          )
-                        ],
-                      ),
-                      child: Text(
-                        child.label!,
-                        style: TextStyle(color: textColor),
-                      ),
+          child: Transform.scale(
+            scale: progress.value,
+            child: Opacity(
+              opacity: progress.value,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: onTap,
+                  borderRadius: BorderRadius.circular(28.0),
+                  child: Container(
+                    constraints: const BoxConstraints(
+                      maxWidth: 200, // Limita a largura máxima
                     ),
-                  FloatingActionButton.small(
-                    heroTag: null,
-                    backgroundColor: child.backgroundColor,
-                    onPressed: null, // A ação é tratada pelo InkWell
-                    child: child.icon,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        if (child.label != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
+                            margin: const EdgeInsets.only(right: 8.0),
+                            decoration: BoxDecoration(
+                              color: surfaceColor,
+                              borderRadius: BorderRadius.circular(8.0),
+                              boxShadow: [
+                                BoxShadow(
+                                  blurRadius: 6.0,
+                                  color: Colors.black.withValues(alpha: 0.15),
+                                  offset: const Offset(0, 2),
+                                )
+                              ],
+                            ),
+                            child: Text(
+                              child.label!,
+                              style: TextStyle(
+                                color: textColor,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        FloatingActionButton.small(
+                          heroTag: null,
+                          backgroundColor: child.backgroundColor,
+                          onPressed: null, // A ação é tratada pelo InkWell
+                          child: child.icon,
+                        ),
+                      ],
+                    ),
                   ),
-                ],
+                ),
               ),
             ),
           ),

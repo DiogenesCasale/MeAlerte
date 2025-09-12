@@ -19,7 +19,7 @@ class BottomNavigationWidget extends StatelessWidget {
     
     return Obx(() {
       // Forçar rebuild quando tema muda
-      themeController.isDarkMode.value;
+      themeController.isDarkMode;
       
       return Container(
         decoration: BoxDecoration(
@@ -46,11 +46,18 @@ class BottomNavigationWidget extends StatelessWidget {
                   isActive: currentIndex == 0,
                 ),
                 _buildNavItem(
-                  icon: Icons.settings_outlined,
-                  activeIcon: Icons.settings,
-                  label: 'Configurações',
+                  icon: Icons.medication_outlined,
+                  activeIcon: Icons.medication,
+                  label: 'Medicamentos',
                   index: 1,
                   isActive: currentIndex == 1,
+                ),
+                _buildNavItem(
+                  icon: Icons.person_outlined,
+                  activeIcon: Icons.person,
+                  label: 'Perfil',
+                  index: 2,
+                  isActive: currentIndex == 2,
                 ),
               ],
             ),

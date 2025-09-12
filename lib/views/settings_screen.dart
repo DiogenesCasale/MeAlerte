@@ -39,7 +39,7 @@ class SettingsScreen extends StatelessWidget {
             _buildSectionHeader('Aparência'),
             const SizedBox(height: 12),
             
-            // Card do tema
+                        // Card do tema
             Container(
               decoration: BoxDecoration(
                 color: surfaceColor,
@@ -52,21 +52,35 @@ class SettingsScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              child: Column(
-                children: [
-                  _buildSettingsTile(
-                    icon: Icons.dark_mode,
-                    title: 'Tema Escuro',
-                    subtitle: 'Alterna entre tema claro e escuro',
-                    trailing: Obx(() => Switch(
-                      value: themeController.isDarkMode.value,
-                      onChanged: (value) {
-                        themeController.toggleTheme();
-                      },
-                      activeColor: primaryColor,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.palette, color: primaryColor, size: 24),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Tema do Aplicativo',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: textColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Obx(() => Column(
+                      children: AppThemeMode.values.map((mode) => _buildThemeOption(
+                        mode,
+                        themeController.themeMode.value == mode,
+                        () => themeController.setThemeMode(mode),
+                      )).toList(),
                     )),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             
@@ -93,7 +107,7 @@ class SettingsScreen extends StatelessWidget {
                   _buildSettingsTile(
                     icon: Icons.info_outline,
                     title: 'Versão',
-                    subtitle: '0.1.0',
+                    subtitle: '0.2.0',
                     onTap: null,
                   ),
                   // Divider(
@@ -179,5 +193,84 @@ class SettingsScreen extends StatelessWidget {
               : null),
       onTap: onTap,
     );
+  }
+
+  Widget _buildThemeOption(AppThemeMode mode, bool isSelected, VoidCallback onTap) {
+    final themeName = _getThemeDisplayName(mode);
+    final themeIcon = _getThemeIcon(mode);
+    final themeDescription = _getThemeDescription(mode);
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: isSelected ? primaryColor.withOpacity(0.1) : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isSelected ? primaryColor : Colors.grey.withOpacity(0.3),
+          width: isSelected ? 2 : 1,
+        ),
+      ),
+      child: ListTile(
+        onTap: onTap,
+        leading: Icon(
+          themeIcon,
+          color: isSelected ? primaryColor : textColor.withOpacity(0.7),
+          size: 24,
+        ),
+        title: Text(
+          themeName,
+          style: TextStyle(
+            color: isSelected ? primaryColor : textColor,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            fontSize: 16,
+          ),
+        ),
+        subtitle: Text(
+          themeDescription,
+          style: TextStyle(
+            color: textColor.withOpacity(0.6),
+            fontSize: 14,
+          ),
+        ),
+        trailing: isSelected ? Icon(
+          Icons.check_circle,
+          color: primaryColor,
+          size: 20,
+        ) : null,
+      ),
+    );
+  }
+
+  String _getThemeDisplayName(AppThemeMode mode) {
+    switch (mode) {
+      case AppThemeMode.light:
+        return 'Tema Claro';
+      case AppThemeMode.dark:
+        return 'Tema Escuro';
+      case AppThemeMode.system:
+        return 'Padrão do Sistema';
+    }
+  }
+
+  IconData _getThemeIcon(AppThemeMode mode) {
+    switch (mode) {
+      case AppThemeMode.light:
+        return Icons.light_mode;
+      case AppThemeMode.dark:
+        return Icons.dark_mode;
+      case AppThemeMode.system:
+        return Icons.settings_brightness;
+    }
+  }
+
+  String _getThemeDescription(AppThemeMode mode) {
+    switch (mode) {
+      case AppThemeMode.light:
+        return 'Sempre usar tema claro';
+      case AppThemeMode.dark:
+        return 'Sempre usar tema escuro';
+      case AppThemeMode.system:
+        return 'Seguir configuração do sistema';
+    }
   }
 } 

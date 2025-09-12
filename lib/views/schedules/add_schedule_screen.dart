@@ -1,20 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:app_remedio/controllers/medication_controller.dart';
+import 'package:app_remedio/controllers/schedules_controller.dart';
 import 'package:app_remedio/models/medication_model.dart';
 import 'package:app_remedio/models/scheduled_medication_model.dart';
 import 'package:app_remedio/utils/constants.dart';
 import 'package:app_remedio/utils/toast_service.dart';
+import 'package:app_remedio/views/main_layout.dart';
+import 'package:app_remedio/views/medication/add_medication_screen.dart';
+import 'package:app_remedio/views/medication/edit_medication_screen.dart';
+import 'package:app_remedio/utils/widgets_default.dart';
+import 'package:app_remedio/utils/profile_helper.dart';
 
-class AddMedicationScreen extends StatefulWidget {
-  const AddMedicationScreen({super.key});
+class AddScheduleScreen extends StatefulWidget {
+  const AddScheduleScreen({super.key});
 
   @override
-  State<AddMedicationScreen> createState() => _AddMedicationScreenState();
+  State<AddScheduleScreen> createState() => _AddScheduleScreenState();
 }
 
-class _AddMedicationScreenState extends State<AddMedicationScreen> {
-  final MedicationController controller = Get.find();
+class _AddScheduleScreenState extends State<AddScheduleScreen> {
+  final MedicationController medicationController = Get.find();
+  final SchedulesController schedulesController = Get.find();
   final _formKey = GlobalKey<FormState>();
   final _doseController = TextEditingController();
   final _intervalController = TextEditingController();
@@ -27,6 +34,13 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
   Medication? _selectedMedication;
   TimeOfDay _selectedTime = TimeOfDay.now();
   OverlayEntry? _overlayEntry;
+  int _observacaoLength = 0;
+  static const int _maxObservacaoLength = 250;
+
+  // Variáveis para o novo sistema de datas
+  DateTime? _dataInicio;
+  DateTime? _dataFim;
+  bool _paraSempre = false;
 
   @override
   void initState() {
@@ -37,6 +51,22 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
       } else {
         _hideDropdown();
       }
+    });
+
+    // Listener para contar caracteres da observação
+    _observacaoController.addListener(() {
+      setState(() {
+        _observacaoLength = _observacaoController.text.length;
+      });
+    });
+
+    // Adiciona listener para fechar dropdown quando outros widgets recebem foco
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      FocusScope.of(context).addListener(() {
+        if (!_medicationFocusNode.hasFocus) {
+          _hideDropdown();
+        }
+      });
     });
   }
 
@@ -54,13 +84,14 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
 
   void _showDropdown() {
     _hideDropdown(); // Remove qualquer dropdown existente
-    
-    final RenderBox? textFieldBox = _textFieldKey.currentContext?.findRenderObject() as RenderBox?;
+
+    final RenderBox? textFieldBox =
+        _textFieldKey.currentContext?.findRenderObject() as RenderBox?;
     if (textFieldBox == null) return;
-    
+
     final Offset textFieldPosition = textFieldBox.localToGlobal(Offset.zero);
     final Size textFieldSize = textFieldBox.size;
-    
+
     _overlayEntry = OverlayEntry(
       builder: (context) => Positioned(
         left: textFieldPosition.dx,
@@ -77,7 +108,7 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
               border: Border.all(color: textColor.withValues(alpha: 0.2)),
             ),
             child: Obx(() {
-              final medications = controller.filteredMedications;
+              final medications = medicationController.filteredMedications;
               if (medications.isEmpty) {
                 return Container(
                   padding: const EdgeInsets.all(16),
@@ -86,31 +117,39 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
                     children: [
                       Text(
                         'Nenhum medicamento encontrado',
-                        style: TextStyle(color: textColor.withValues(alpha: 0.6)),
+                        style: TextStyle(
+                          color: textColor.withValues(alpha: 0.6),
+                        ),
                       ),
                       const SizedBox(height: 8),
                       TextButton.icon(
                         onPressed: () {
                           _hideDropdown();
                           _medicationFocusNode.unfocus();
-                          _showAddMedicationDialog();
+                          Get.to(
+                            () => const AddMedicationScreen(
+                              showMedicationListScreen: false,
+                            ),
+                          );
                         },
                         icon: Icon(Icons.add, color: primaryColor),
-                        label: Text('Cadastrar Novo', style: TextStyle(color: primaryColor)),
+                        label: Text(
+                          'Cadastrar Novo',
+                          style: TextStyle(color: primaryColor),
+                        ),
                       ),
                     ],
                   ),
                 );
               }
-              
+
               return ListView.separated(
                 shrinkWrap: true,
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                itemCount: medications.length + 1, // +1 para o botão "Cadastrar Novo"
-                separatorBuilder: (context, index) => Divider(
-                  height: 1,
-                  color: textColor.withValues(alpha: 0.1),
-                ),
+                itemCount:
+                    medications.length + 1, // +1 para o botão "Cadastrar Novo"
+                separatorBuilder: (context, index) =>
+                    Divider(height: 1, color: textColor.withValues(alpha: 0.1)),
                 itemBuilder: (context, index) {
                   if (index == medications.length) {
                     // Botão "Cadastrar Novo" no final da lista
@@ -118,7 +157,11 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
                       onTap: () {
                         _hideDropdown();
                         _medicationFocusNode.unfocus();
-                        _showAddMedicationDialog();
+                        Get.to(
+                          () => const AddMedicationScreen(
+                            showMedicationListScreen: false,
+                          ),
+                        );
                       },
                       borderRadius: BorderRadius.circular(8),
                       child: Container(
@@ -139,7 +182,7 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
                       ),
                     );
                   }
-                  
+
                   final medication = medications[index];
                   return InkWell(
                     onTap: () => _onMedicationSelected(medication),
@@ -161,13 +204,27 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
                                   ),
                                 ),
                                 Text(
-                                  'Estoque: ${medication.quantidade}',
+                                  'Estoque: ${medication.estoque} ${medication.tipo.unit}',
                                   style: TextStyle(
                                     color: textColor.withValues(alpha: 0.6),
                                     fontSize: 12,
                                   ),
                                 ),
                               ],
+                            ),
+                          ),
+                          // botão de editar
+                          IconButton(
+                            onPressed: () => Get.to(
+                              () => EditMedicationScreen(
+                                medication: medication,
+                                showMedicationListScreen: false,
+                              ),
+                            ),
+                            icon: Icon(
+                              Icons.edit,
+                              color: primaryColor,
+                              size: 20,
                             ),
                           ),
                         ],
@@ -181,7 +238,7 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
         ),
       ),
     );
-    
+
     Overlay.of(context).insert(_overlayEntry!);
   }
 
@@ -192,7 +249,10 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
 
   Future<void> _addScheduledMedication() async {
     if (!_formKey.currentState!.validate()) {
-      ToastService.showError(context, 'Por favor, corrija os campos destacados.');
+      ToastService.showError(
+        context,
+        'Por favor, corrija os campos destacados.',
+      );
       return;
     }
 
@@ -201,126 +261,54 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
       return;
     }
 
+    // Validação das datas
+    if (!_paraSempre) {
+      if (_dataInicio == null || _dataFim == null) {
+        ToastService.showError(
+          context,
+          'Por favor, defina as datas de início e fim do tratamento.',
+        );
+        return;
+      }
+      if (_dataFim!.isBefore(_dataInicio!)) {
+        ToastService.showError(
+          context,
+          'A data de fim deve ser posterior à data de início.',
+        );
+        return;
+      }
+    }
+
     try {
       final scheduledMedication = ScheduledMedication(
-        medicamentoId: _selectedMedication!.id!,
+        idMedicamento: _selectedMedication!.id!,
         dose: double.parse(_doseController.text.trim()),
-        hora: '${_selectedTime.hour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')}',
+        hora:
+            '${_selectedTime.hour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')}',
         intervalo: int.parse(_intervalController.text),
-        dias: int.parse(_durationController.text),
-        observacao: _observacaoController.text.trim().isEmpty ? null : _observacaoController.text.trim(),
+        dias: _paraSempre
+            ? 0
+            : (_dataFim!.difference(_dataInicio!).inDays +
+                  1), // Compatibilidade
+        dataInicio: _paraSempre ? null : _dataInicio!.toIso8601String(),
+        dataFim: _paraSempre ? null : _dataFim!.toIso8601String(),
+        paraSempre: _paraSempre,
+        observacao: _observacaoController.text.trim().isEmpty
+            ? null
+            : _observacaoController.text.trim(),
+        idPerfil: ProfileHelper.currentProfileId,
       );
-      
-      await controller.addScheduledMedication(scheduledMedication);
-      
+
+      await schedulesController.addNewScheduled(scheduledMedication);
+
       ToastService.showSuccess(context, 'Medicamento agendado com sucesso!');
-      Get.back();
+      Get.offAll(() => MainLayout(initialIndex: 0));
     } catch (e) {
-      ToastService.showError(context, 'Erro ao agendar medicamento. Tente novamente.');
+      ToastService.showError(
+        context,
+        'Erro ao agendar medicamento. Tente novamente.',
+      );
     }
-  }
-
-  void _showAddMedicationDialog() {
-    final nameController = TextEditingController();
-    final stockController = TextEditingController();
-    final observacaoController = TextEditingController();
-    final dialogFormKey = GlobalKey<FormState>();
-
-    Get.dialog(
-      AlertDialog(
-        backgroundColor: surfaceColor,
-        title: Text('Novo Medicamento', style: heading2Style),
-        content: Form(
-          key: dialogFormKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: nameController,
-                decoration: InputDecoration(
-                  labelText: 'Nome *',
-                  labelStyle: TextStyle(color: textColor),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
-                  filled: true,
-                  fillColor: backgroundColor,
-                ),
-                style: TextStyle(color: textColor),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) {
-                    return 'Nome é obrigatório';
-                  }
-                  if (v.trim().length < 2) {
-                    return 'Nome deve ter pelo menos 2 caracteres';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: stockController,
-                decoration: InputDecoration(
-                  labelText: 'Quantidade *',
-                  labelStyle: TextStyle(color: textColor),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
-                  filled: true,
-                  fillColor: backgroundColor,
-                ),
-                style: TextStyle(color: textColor),
-                keyboardType: TextInputType.number,
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) {
-                    return 'Quantidade é obrigatória';
-                  }
-                  final quantity = int.tryParse(v);
-                  if (quantity == null || quantity < 0) {
-                    return 'Quantidade deve ser um número ≥ 0';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: observacaoController,
-                decoration: InputDecoration(
-                  labelText: 'Observações',
-                  labelStyle: TextStyle(color: textColor),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
-                  filled: true,
-                  fillColor: backgroundColor,
-                ),
-                style: TextStyle(color: textColor),
-                maxLines: 2,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: Text('Cancelar', style: TextStyle(color: textColor)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (dialogFormKey.currentState!.validate()) {
-                try {
-                  await controller.addNewMedication(
-                    nameController.text.trim(),
-                    int.parse(stockController.text),
-                    observacaoController.text.trim().isEmpty ? null : observacaoController.text.trim(),
-                  );
-                  Get.back();
-                  ToastService.showSuccess(context, 'Medicamento adicionado com sucesso!');
-                } catch (e) {
-                  ToastService.showError(context, 'Erro ao adicionar medicamento. Tente novamente.');
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
-            child: const Text('Salvar', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
   }
 
   void _onMedicationSelected(Medication medication) {
@@ -330,10 +318,11 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
     });
     _hideDropdown();
     _medicationFocusNode.unfocus();
+    FocusScope.of(context).unfocus(); // Garantir que o foco seja removido
   }
 
   void _onSearchChanged(String query) {
-    controller.searchMedications(query);
+    medicationController.searchMedications(query);
     if (query.isEmpty) {
       setState(() {
         _selectedMedication = null;
@@ -355,6 +344,7 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
         onTap: () {
           _medicationFocusNode.unfocus();
           _hideDropdown();
+          FocusScope.of(context).unfocus(); // Remove foco de todos os campos
         },
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -365,7 +355,7 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
               children: [
                 Text('Medicamento *', style: heading2Style),
                 const SizedBox(height: 8),
-                
+
                 // Campo de busca/seleção unificado
                 TextFormField(
                   key: _textFieldKey,
@@ -373,7 +363,9 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
                   focusNode: _medicationFocusNode,
                   decoration: InputDecoration(
                     hintText: 'Digite o nome do medicamento...',
-                    hintStyle: TextStyle(color: textColor.withValues(alpha: 0.5)),
+                    hintStyle: TextStyle(
+                      color: textColor.withValues(alpha: 0.5),
+                    ),
                     suffixIcon: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -385,20 +377,29 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
                                 _selectedMedication = null;
                                 _medicationSearchController.clear();
                               });
-                              controller.searchMedications('');
+                              medicationController.searchMedications('');
                               _hideDropdown();
                             },
                           ),
-                        Icon(_overlayEntry != null ? Icons.expand_less : Icons.expand_more, color: textColor),
+                        Icon(
+                          _overlayEntry != null
+                              ? Icons.expand_less
+                              : Icons.expand_more,
+                          color: textColor,
+                        ),
                         const SizedBox(width: 8),
                       ],
                     ),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12.0),
+                    ),
                     filled: true,
                     fillColor: backgroundColor,
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12.0),
-                      borderSide: BorderSide(color: textColor.withValues(alpha: 0.3)),
+                      borderSide: BorderSide(
+                        color: textColor.withValues(alpha: 0.3),
+                      ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12.0),
@@ -407,14 +408,16 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
                   ),
                   style: TextStyle(color: textColor),
                   onChanged: _onSearchChanged,
-                  validator: (value) => _selectedMedication == null ? 'Selecione um medicamento' : null,
+                  validator: (value) => _selectedMedication == null
+                      ? 'Selecione um medicamento'
+                      : null,
                 ),
-                
+
                 const SizedBox(height: 20),
-                
-                _buildTextField(
-                  controller: _doseController, 
-                  label: 'Dose (quantidade) *', 
+
+                WidgetsDefault.buildTextField(
+                  controller: _doseController,
+                  label: 'Dose (quantidade) *',
                   hint: 'Ex: 1, 2, 0.5',
                   keyboardType: TextInputType.numberWithOptions(decimal: true),
                   validator: (v) {
@@ -429,69 +432,35 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
                   },
                 ),
                 const SizedBox(height: 20),
-                
-                _buildTimePicker('Hora Início *', '${_selectedTime.hour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')}', _selectTime),
-                const SizedBox(height: 20),
-                
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildTextField(
-                        controller: _intervalController, 
-                        label: 'Intervalo (horas) *', 
-                        hint: '8', 
-                        keyboardType: TextInputType.number,
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) {
-                            return 'Intervalo é obrigatório';
-                          }
-                          final interval = int.tryParse(v);
-                          if (interval == null || interval <= 0) {
-                            return 'Intervalo deve ser > 0';
-                          }
-                          return null;
-                        },
-                      )
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildTextField(
-                        controller: _durationController, 
-                        label: 'Duração (dias) *', 
-                        hint: '7', 
-                        keyboardType: TextInputType.number,
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) {
-                            return 'Duração é obrigatória';
-                          }
-                          final duration = int.tryParse(v);
-                          if (duration == null || duration <= 0) {
-                            return 'Duração deve ser > 0';
-                          }
-                          return null;
-                        },
-                      )
-                    ),
-                  ],
+
+                _buildTimePicker(
+                  'Hora Início *',
+                  '${_selectedTime.hour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')}',
+                  _selectTime,
                 ),
                 const SizedBox(height: 20),
-                
-                _buildTextField(
-                  controller: _observacaoController,
-                  label: 'Observações',
-                  hint: 'Observações adicionais (opcional)',
-                  maxLines: 3,
-                ),
+
+                _buildResponsiveIntervalFields(),
+                const SizedBox(height: 20),
+                _buildDurationSelector(),
+                const SizedBox(height: 20),
+
+                _buildObservationField(),
                 const SizedBox(height: 40),
-                
+
                 ElevatedButton(
                   onPressed: _addScheduledMedication,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primaryColor,
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                  child: const Text('Agendar Medicamento', style: TextStyle(color: Colors.white, fontSize: 16)),
+                  child: const Text(
+                    'Agendar Medicamento',
+                    style: TextStyle(color: Colors.white, fontSize: 16),
+                  ),
                 ),
               ],
             ),
@@ -503,7 +472,7 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
 
   Future<void> _selectTime() async {
     final TimeOfDay? picked = await showTimePicker(
-      context: context, 
+      context: context,
       initialTime: _selectedTime,
       builder: (context, child) {
         return MediaQuery(
@@ -519,7 +488,9 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
                 entryModeIconColor: textColor,
                 dayPeriodTextColor: textColor,
                 dayPeriodColor: surfaceColor,
-                dayPeriodBorderSide: BorderSide(color: textColor.withValues(alpha: 0.3)),
+                dayPeriodBorderSide: BorderSide(
+                  color: textColor.withValues(alpha: 0.3),
+                ),
                 helpTextStyle: TextStyle(color: textColor),
                 hourMinuteTextStyle: TextStyle(color: textColor, fontSize: 24),
                 inputDecorationTheme: InputDecorationTheme(
@@ -527,11 +498,15 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
                   filled: true,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: textColor.withValues(alpha: 0.3)),
+                    borderSide: BorderSide(
+                      color: textColor.withValues(alpha: 0.3),
+                    ),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: textColor.withValues(alpha: 0.3)),
+                    borderSide: BorderSide(
+                      color: textColor.withValues(alpha: 0.3),
+                    ),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -570,37 +545,151 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
               children: [
                 Text(value, style: TextStyle(color: textColor)),
                 Icon(Icons.access_time, size: 18, color: textColor),
-              ]
-            )
-          )
-        )
-      ]
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    TextInputType keyboardType = TextInputType.text,
-    String? Function(String?)? validator,
-    int maxLines = 1,
-  }) {
+  Widget _buildResponsiveIntervalFields() {
+    return WidgetsDefault.buildTextField(
+      controller: _intervalController,
+      label: 'Intervalo (horas) *',
+      hint: '8',
+      keyboardType: TextInputType.number,
+      validator: (v) {
+        if (v == null || v.trim().isEmpty) {
+          return 'Intervalo é obrigatório';
+        }
+        final interval = int.tryParse(v);
+        if (interval == null || interval <= 0) {
+          return 'Intervalo deve ser > 0';
+        }
+        return null;
+      },
+    );
+  }
+
+  Widget _buildDurationSelector() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: heading2Style),
+        Text('Duração do Tratamento *', style: heading2Style),
+        const SizedBox(height: 12),
+
+        // Opção "Para Sempre"
+        Container(
+          decoration: BoxDecoration(
+            color: _paraSempre
+                ? primaryColor.withOpacity(0.1)
+                : backgroundColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: _paraSempre ? primaryColor : textColor.withOpacity(0.3),
+              width: _paraSempre ? 2 : 1,
+            ),
+          ),
+          child: CheckboxListTile(
+            title: Text(
+              'Tratamento Contínuo (Para Sempre)',
+              style: TextStyle(
+                color: _paraSempre ? primaryColor : textColor,
+                fontWeight: _paraSempre ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+            subtitle: Text(
+              'O medicamento será tomado indefinidamente',
+              style: TextStyle(color: textColor.withOpacity(0.6), fontSize: 12),
+            ),
+            value: _paraSempre,
+            onChanged: (value) {
+              setState(() {
+                _paraSempre = value ?? false;
+                if (_paraSempre) {
+                  _dataInicio = null;
+                  _dataFim = null;
+                }
+              });
+            },
+            activeColor: primaryColor,
+            controlAffinity: ListTileControlAffinity.leading,
+          ),
+        ),
+
+        if (!_paraSempre) ...[
+          const SizedBox(height: 16),
+          // Seleção de período específico
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: backgroundColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: textColor.withOpacity(0.3)),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: WidgetsDefault.buildDateField(
+                        label: 'Data Início',
+                        value: _dataInicio,
+                        onTap: () => _selectStartDate(),
+                        isRequired: true,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: WidgetsDefault.buildDateField(
+                        label: 'Data Fim',
+                        value: _dataFim,
+                        onTap: () => _selectEndDate(),
+                        isRequired: true,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildObservationField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Observações', style: heading2Style),
+            Text(
+              '$_observacaoLength/$_maxObservacaoLength',
+              style: TextStyle(
+                color: _observacaoLength > _maxObservacaoLength
+                    ? Colors.red
+                    : textColor.withOpacity(0.6),
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 8),
         TextFormField(
-          controller: controller,
-          keyboardType: keyboardType,
-          maxLines: maxLines,
+          controller: _observacaoController,
+          maxLines: 3,
+          maxLength: _maxObservacaoLength,
           style: TextStyle(color: textColor),
           decoration: InputDecoration(
-            hintText: hint,
+            hintText: 'Observações adicionais (opcional)',
             hintStyle: TextStyle(color: textColor.withValues(alpha: 0.5)),
             filled: true,
             fillColor: backgroundColor,
+            counterText: '', // Remove contador padrão
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12.0),
               borderSide: BorderSide.none,
@@ -618,9 +707,77 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
               borderSide: BorderSide(color: secondaryColor, width: 2),
             ),
           ),
-          validator: validator,
-        )
-      ]
+          validator: (value) {
+            if (value != null && value.length > _maxObservacaoLength) {
+              return 'Observação não pode exceder $_maxObservacaoLength caracteres';
+            }
+            return null;
+          },
+        ),
+      ],
     );
   }
+
+  Future<void> _selectStartDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dataInicio ?? DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: primaryColor,
+              onPrimary: Colors.white,
+              surface: surfaceColor,
+              onSurface: textColor,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        _dataInicio = picked;
+        // Se data fim foi definida e é anterior à nova data início, resetar
+        if (_dataFim != null && _dataFim!.isBefore(picked)) {
+          _dataFim = null;
+        }
+      });
+    }
+  }
+
+  Future<void> _selectEndDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate:
+          _dataFim ??
+          _dataInicio?.add(const Duration(days: 7)) ??
+          DateTime.now().add(const Duration(days: 7)),
+      firstDate: _dataInicio ?? DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: primaryColor,
+              onPrimary: Colors.white,
+              surface: surfaceColor,
+              onSurface: textColor,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        _dataFim = picked;
+      });
+    }
+  }
+
+  
 }

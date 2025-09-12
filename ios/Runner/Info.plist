@@ -47,5 +47,9 @@
 		<true/>
 		<key>UIStatusBarHidden</key>
 		<false/>
+		<key>NSCameraUsageDescription</key>
+		<string>Este app precisa de acesso à câmera para tirar fotos dos medicamentos.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>Este app precisa de acesso à galeria para selecionar fotos dos medicamentos.</string>
 	</dict>
 </plist>

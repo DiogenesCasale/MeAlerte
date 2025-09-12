@@ -1,28 +1,33 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
-import 'package:app_remedio/models/medication_model.dart';
-import 'package:app_remedio/models/scheduled_medication_model.dart';
-import 'package:intl/intl.dart';
 
 class DatabaseController {
+  // --- Configuração do Singleton ---
   static final DatabaseController instance = DatabaseController._init();
   static Database? _database;
   DatabaseController._init();
 
+  // --- Getter principal para o banco de dados ---
   Future<Database> get database async {
     if (_database != null) return _database!;
     _database = await _initDB('app_remedio_v4.db');
     return _database!;
   }
 
+  // --- Inicialização e criação das tabelas ---
   Future<Database> _initDB(String filePath) async {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
-    return await openDatabase(path, version: 1, onCreate: _createDB);
+    return await openDatabase(
+      path,
+      version: 4,
+      onCreate: _createDB,
+      onUpgrade: _onUpgrade,
+    );
   }
 
   Future _createDB(Database db, int version) async {
-    // Tabela de medicamentos conforme documentação
+    // Tabela de medicamentos
     await db.execute('''
       CREATE TABLE tblMedicamentos ( 
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
@@ -33,7 +38,7 @@ class DatabaseController {
       )
     ''');
 
-    // Tabela de medicamentos agendados conforme documentação
+    // Tabela de medicamentos agendados
     await db.execute('''
       CREATE TABLE tblMedicamentosAgendados (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,129 +54,225 @@ class DatabaseController {
     ''');
   }
 
-  // --- MÉTODOS PARA MEDICAMENTOS ---
-  Future<Medication> createMedication(Medication medication) async {
-    final db = await instance.database;
-    final id = await db.insert('tblMedicamentos', medication.toMap());
-    return medication.copyWith(id: id);
-  }
-
-  Future<List<Medication>> getAllMedications() async {
-    final db = await instance.database;
-    final result = await db.query('tblMedicamentos', orderBy: 'nome ASC');
-    return result.map((json) => Medication.fromMap(json)).toList();
-  }
-
-  Future<List<Medication>> searchMedications(String query) async {
-    final db = await instance.database;
-    final result = await db.query(
-      'tblMedicamentos',
-      where: 'nome LIKE ?',
-      whereArgs: ['%$query%'],
-      orderBy: 'nome ASC',
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    print(
+      "Executando migração do banco de dados da versão $oldVersion para $newVersion...",
     );
-    return result.map((json) => Medication.fromMap(json)).toList();
-  }
 
-  // --- MÉTODOS PARA MEDICAMENTOS AGENDADOS ---
-  Future<ScheduledMedication> createScheduledMedication(ScheduledMedication scheduledMedication) async {
-    final db = await instance.database;
-    final id = await db.insert('tblMedicamentosAgendados', scheduledMedication.toMap());
-    return scheduledMedication.copyWith(id: id);
-  }
-
-  Future<void> updateScheduledMedication(ScheduledMedication scheduledMedication) async {
-    final db = await instance.database;
-    await db.update(
-      'tblMedicamentosAgendados',
-      scheduledMedication.toMap(),
-      where: 'id = ?',
-      whereArgs: [scheduledMedication.id],
-    );
-  }
-
-  Future<void> deleteScheduledMedication(int id) async {
-    final db = await instance.database;
-    await db.delete(
-      'tblMedicamentosAgendados',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-  }
-
-  Future<List<ScheduledMedication>> getAllScheduledMedications() async {
-    final db = await instance.database;
-    final result = await db.rawQuery('''
-      SELECT 
-        s.id, s.hora, s.dose, s.intervalo, s.dias, s.observacao, s.medicamento_id, s.data_criacao,
-        m.nome as medicationName
-      FROM tblMedicamentosAgendados s
-      INNER JOIN tblMedicamentos m ON s.medicamento_id = m.id
-      ORDER BY s.hora ASC
-    ''');
-    return result.map((json) => ScheduledMedication.fromMapWithMedication(json)).toList();
-  }
-
-  // Gera as doses do dia baseado nos medicamentos agendados
-  Future<Map<String, List<TodayDose>>> getTodayDoses() async {
-    final db = await instance.database;
-    final result = await db.rawQuery('''
-      SELECT 
-        s.id, s.hora, s.dose, s.intervalo, s.dias, s.observacao, s.medicamento_id, s.data_criacao,
-        m.nome as medicationName
-      FROM tblMedicamentosAgendados s
-      INNER JOIN tblMedicamentos m ON s.medicamento_id = m.id
-    ''');
-
-    final List<ScheduledMedication> scheduledMedications = result.isNotEmpty 
-        ? result.map((json) => ScheduledMedication.fromMapWithMedication(json)).toList() 
-        : [];
-
-    final Map<String, List<TodayDose>> groupedDoses = {};
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-
-    for (var scheduled in scheduledMedications) {
-      if (scheduled.dataCriacao == null) continue;
-      
-      try {
-        final creationDate = DateTime.parse(scheduled.dataCriacao!);
-        final endDate = creationDate.add(Duration(days: scheduled.dias));
-        
-        // Verifica se o medicamento ainda está ativo (dentro do período de dias)
-        if (now.isBefore(endDate)) {
-          // Parse da hora inicial
-          final timeParts = scheduled.hora.split(':');
-          final hour = int.parse(timeParts[0]);
-          final minute = int.parse(timeParts[1]);
-          
-          // Calcula todas as doses do dia baseado no intervalo
-          DateTime doseTime = today.add(Duration(hours: hour, minutes: minute));
-          
-          while (doseTime.day == today.day) {
-            final timeKey = DateFormat('HH:mm').format(doseTime);
-            
-            final todayDose = TodayDose(
-              scheduledMedicationId: scheduled.id!,
-              medicationName: scheduled.medicationName!,
-              dose: scheduled.dose,
-              scheduledTime: doseTime,
-              observacao: scheduled.observacao,
-            );
-
-            groupedDoses.putIfAbsent(timeKey, () => []).add(todayDose);
-            
-            // Próxima dose
-            doseTime = doseTime.add(Duration(hours: scheduled.intervalo));
-          }
-        }
-      } catch (e) {
-        print('Erro ao processar medicamento agendado ${scheduled.id}: $e');
-        continue;
+    // Um loop que executa cada migração necessária, uma por uma.
+    // Por exemplo, ao atualizar da v1 para a v4, ele executará as migrações
+    // para a v2, depois para a v3 e, finalmente, para a v4.
+    for (int version = oldVersion + 1; version <= newVersion; version++) {
+      print("Aplicando migração para a versão $version...");
+      switch (version) {
+        case 2:
+          await _migrateToV2(db);
+          break;
+        case 3:
+          await _migrateToV3(db);
+          break;
+        case 4:
+          await _migrateToV4(db);
+          break;
+        // Adicione novos 'cases' aqui para futuras versões.
+        // case 5:
+        //   await _migrateToV5(db);
+        //   break;
       }
     }
-    
-    final sortedKeys = groupedDoses.keys.toList()..sort();
-    return {for (var k in sortedKeys) k: groupedDoses[k]!};
+
+    print("Migração do banco de dados concluída com sucesso.");
+  }
+
+  Future<void> _migrateToV2(Database db) async {
+    final batch = db.batch();
+
+    print("Migração da v1 para v2...");
+
+    // Alterações na tblMedicamentos
+    // NOTA: SQLite não permite renomear colunas em todas as versões.
+    // O comando 'RENAME COLUMN' é mais recente. A maneira mais segura seria criar uma
+    // nova tabela, copiar os dados e renomear, mas para simplicidade, usaremos o ALTER.
+    // Assumindo que a coluna se chamava 'quantidade' e agora é 'estoque'.
+    // Se sua tabela já tinha 'estoque', este comando não é necessário.
+    batch.execute(
+      'ALTER TABLE tblMedicamentos RENAME COLUMN quantidade TO estoque;',
+    );
+
+    batch.execute(
+      "ALTER TABLE tblMedicamentos ADD COLUMN tipo TEXT NOT NULL DEFAULT 'comprimido';",
+    );
+
+    // Alterações na tblMedicamentosAgendados
+    batch.execute(
+      'ALTER TABLE tblMedicamentosAgendados ADD COLUMN data_inicio TEXT;',
+    );
+    batch.execute(
+      'ALTER TABLE tblMedicamentosAgendados ADD COLUMN data_fim TEXT;',
+    );
+    batch.execute(
+      'ALTER TABLE tblMedicamentosAgendados ADD COLUMN para_sempre INTEGER DEFAULT 0;',
+    );
+    batch.execute(
+      'ALTER TABLE tblMedicamentosAgendados ADD COLUMN deletado INTEGER DEFAULT 0;',
+    );
+
+    await batch.commit();
+    print("Migração v1 para v2 concluída com sucesso.");
+  }
+
+  Future<void> _migrateToV3(Database db) async {
+    final batch = db.batch();
+
+    // Renomeia colunas para o padrão camelCase
+    batch.execute(
+      'ALTER TABLE tblMedicamentos RENAME COLUMN data_criacao TO dataCriacao;',
+    );
+    batch.execute(
+      'ALTER TABLE tblMedicamentosAgendados RENAME COLUMN data_criacao TO dataCriacao;',
+    );
+    batch.execute(
+      'ALTER TABLE tblMedicamentosAgendados RENAME COLUMN medicamento_id TO idMedicamento;',
+    );
+    batch.execute(
+      'ALTER TABLE tblMedicamentosAgendados RENAME COLUMN data_inicio TO dataInicio;',
+    );
+    batch.execute(
+      'ALTER TABLE tblMedicamentosAgendados RENAME COLUMN data_fim TO dataFim;',
+    );
+    batch.execute(
+      'ALTER TABLE tblMedicamentosAgendados RENAME COLUMN para_sempre TO paraSempre;',
+    );
+
+    // Adiciona novas colunas
+    batch.execute(
+      'ALTER TABLE tblMedicamentosAgendados ADD COLUMN dataAtualizacao TEXT;',
+    );
+    batch.execute(
+      'ALTER TABLE tblMedicamentos ADD COLUMN deletado INTEGER DEFAULT 0;',
+    );
+    batch.execute(
+      'ALTER TABLE tblMedicamentos ADD COLUMN caminhoImagem TEXT NULL;',
+    );
+    batch.execute(
+      'ALTER TABLE tblMedicamentos ADD COLUMN dataAtualizacao TEXT;',
+    );
+
+    // Cria a nova tabela de perfil
+    batch.execute('''
+    CREATE TABLE tblPerfil (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nome TEXT NOT NULL,
+      dataNascimento TEXT NULL,
+      genero TEXT NULL,
+      peso REAL NULL,
+      caminhoImagem TEXT NULL,
+      deletado INTEGER DEFAULT 0,
+      dataCriacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      dataAtualizacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  ''');
+
+    // Adiciona a referência de perfil às tabelas existentes
+    batch.execute(
+      'ALTER TABLE tblMedicamentos ADD COLUMN idPerfil INTEGER NOT NULL DEFAULT 1;',
+    );
+    batch.execute(
+      'ALTER TABLE tblMedicamentosAgendados ADD COLUMN idPerfil INTEGER NOT NULL DEFAULT 1;',
+    );
+
+    await batch.commit();
+    print("Migração para v3 concluída.");
+  }
+
+  /// Migração da v3 para v4: Adiciona a tabela para controle de doses tomadas.
+  Future<void> _migrateToV4(Database db) async {
+    final batch = db.batch();
+
+    // Cria a tabela de doses tomadas
+    batch.execute('''
+    CREATE TABLE tblDosesTomadas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      idAgendamento INTEGER NOT NULL,
+      dataTomada TEXT NOT NULL,
+      horarioTomada TEXT NOT NULL,
+      horarioAgendado TEXT NOT NULL,
+      idPerfil INTEGER NOT NULL,
+      observacao TEXT,
+      deletado INTEGER DEFAULT 0,
+      dataCriacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      dataAtualizacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (idAgendamento) REFERENCES tblMedicamentosAgendados (id) ON DELETE CASCADE
+    )
+  ''');
+
+    await batch.commit();
+    print("Migração para v4 concluída.");
+  }
+
+  // METODO DE DEBUG DOS CAMPOS DA TABELA
+  Future<void> _inspectTable(Database db, String tableName) async {
+    print("\n--- Inspecionando a tabela: '$tableName' ---");
+    try {
+      // 1. Verifica a ESTRUTURA (colunas)
+      final tableInfo = await db.rawQuery('PRAGMA table_info($tableName);');
+      print("Estrutura (Colunas):");
+      if (tableInfo.isEmpty) {
+        print("  (A tabela não existe ou não tem colunas)");
+      } else {
+        for (var column in tableInfo) {
+          print(
+            "  - Nome: ${column['name']}, Tipo: ${column['type']}, Nulo: ${column['notnull'] == 0}",
+          );
+        }
+      }
+
+      // 2. Verifica os DADOS (as 5 primeiras linhas)
+      final sampleData = await db.query(tableName, limit: 5);
+      print("\nAmostra de Dados (até 5 linhas):");
+      if (sampleData.isEmpty) {
+        print("  (A tabela está vazia)");
+      } else {
+        for (var row in sampleData) {
+          print("  - $row");
+        }
+      }
+    } catch (e) {
+      print("  Erro ao inspecionar a tabela '$tableName': $e");
+    }
+    print("--- Fim da inspeção de '$tableName' ---\n");
+  }
+
+  // METODO DE DEBUG DOS DADOS DA TABELA
+  Future<void> debugPrintTableData(Database db, String tableName) async {
+    print("\n--- 🕵️  [DEBUG] Conteúdo da Tabela: '$tableName' 🕵️ ---");
+    try {
+      // 1. Executa a query para buscar todos os dados
+      final List<Map<String, dynamic>> results = await db.query(tableName);
+
+      // 2. Verifica se a tabela está vazia
+      if (results.isEmpty) {
+        print("|| A tabela está vazia ou não existe. ||");
+        print("--- Fim do conteúdo de '$tableName' ---\n");
+        return;
+      }
+
+      // 3. Monta e imprime o cabeçalho com os nomes das colunas
+      final columns = results.first.keys;
+      final header = columns.map((col) => col.padRight(15)).join(' | ');
+      print(header);
+      print('-' * header.length); // Linha separadora
+
+      // 4. Itera sobre cada linha e imprime os dados
+      for (final row in results) {
+        final rowValues = columns
+            .map((col) => (row[col]?.toString() ?? 'NULL').padRight(15))
+            .join(' | ');
+        print(rowValues);
+      }
+    } catch (e) {
+      print("🚨 Erro ao ler a tabela '$tableName': $e");
+    }
+    print("--- Fim do conteúdo de '$tableName' ---\n");
   }
 }
