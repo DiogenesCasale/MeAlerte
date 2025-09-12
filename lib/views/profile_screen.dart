@@ -339,9 +339,4 @@ class ProfileScreen extends StatelessWidget {
       indent: 60,
     );
   }
-
-  void _editProfile(dynamic profile) {
-    Get.to(() => EditProfileScreen(profile: profile));
-  }
-
 }

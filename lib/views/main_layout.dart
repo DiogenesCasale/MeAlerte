@@ -4,8 +4,6 @@ import 'package:app_remedio/views/medication/medication_list_screen.dart';
 import 'package:app_remedio/views/profile_screen.dart';
 import 'package:app_remedio/controllers/profile_controller.dart';
 import 'package:app_remedio/widgets/bottom_navigation_widget.dart';
-import 'package:app_remedio/views/profile/profile_list_screen.dart';
-import 'package:app_remedio/views/profile_screen.dart';
 import 'package:get/get.dart';
 
 class MainLayout extends StatefulWidget {
