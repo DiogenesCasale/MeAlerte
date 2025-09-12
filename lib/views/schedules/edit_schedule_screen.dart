@@ -5,7 +5,6 @@ import 'package:app_remedio/models/scheduled_medication_model.dart';
 import 'package:app_remedio/utils/constants.dart';
 import 'package:app_remedio/utils/toast_service.dart';
 import 'package:app_remedio/views/main_layout.dart';
-import 'package:app_remedio/utils/profile_helper.dart';
 
 class EditScheduleScreen extends StatefulWidget {
   final TodayDose dose;
