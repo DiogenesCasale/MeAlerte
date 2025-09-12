@@ -11,15 +11,15 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
-  sqflite: ^2.3.0
-  path: ^1.8.3
-  intl: ^0.20.2
-  get: ^4.6.6
-  shared_preferences: ^2.2.2
-  image_picker: ^1.2.0
-  path_provider: ^2.1.5
-  local_auth: ^2.1.8
-  scrollable_positioned_list: ^0.3.8
+  sqflite: ^2.3.0 # SQLite - Banco de dados
+  path: ^1.8.3 # Para manipular caminhos de arquivos
+  intl: ^0.20.2 # Internacionalização
+  get: ^4.6.6 # Injeção de dependências
+  shared_preferences: ^2.2.2 # Para salvar o perfil atual
+  image_picker: ^1.2.0 # Para selecionar imagens do dispositivo
+  path_provider: ^2.1.5 # Para salvar imagens do dispositivo
+  local_auth: ^2.1.8 # Biometria - Permite usar a autenticação biométrica/senha do dispositivo
+  scrollable_positioned_list: ^0.3.8 # Para a rolagem da lista de datas na tela de agendamentos
 
 dev_dependencies:
   flutter_test:
