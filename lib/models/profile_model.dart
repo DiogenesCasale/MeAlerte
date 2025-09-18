@@ -3,7 +3,6 @@ class Profile {
   final String nome;
   final String? dataNascimento;
   final String? genero;
-  final double? peso;
   final String? caminhoImagem;
   final bool deletado;
   final String? dataCriacao;
@@ -14,7 +13,6 @@ class Profile {
     required this.nome,
     this.dataNascimento,
     this.genero,
-    this.peso,
     this.caminhoImagem,
     this.deletado = false,
     this.dataCriacao,
@@ -27,7 +25,6 @@ class Profile {
       nome: map['nome'],
       dataNascimento: map['dataNascimento'],
       genero: map['genero'],
-      peso: map['peso']?.toDouble(),
       caminhoImagem: map['caminhoImagem'],
       deletado: (map['deletado'] ?? 0) == 1,
       dataCriacao: map['data_criacao'] ?? map['dataCriacao'],
@@ -41,7 +38,6 @@ class Profile {
       'nome': nome,
       'dataNascimento': dataNascimento,
       'genero': genero,
-      'peso': peso,
       'deletado': deletado ? 1 : 0,
       'caminhoImagem': caminhoImagem,
       'dataCriacao': dataCriacao ?? DateTime.now().toIso8601String(),
@@ -54,7 +50,6 @@ class Profile {
     String? nome,
     String? dataNascimento,
     String? genero,
-    double? peso,
     String? caminhoImagem,
     bool? deletado,
     String? dataCriacao,
@@ -65,7 +60,6 @@ class Profile {
       nome: nome ?? this.nome,
       dataNascimento: dataNascimento ?? this.dataNascimento,
       genero: genero ?? this.genero,
-      peso: peso ?? this.peso,
       caminhoImagem: caminhoImagem ?? this.caminhoImagem,
       deletado: deletado ?? this.deletado,
       dataCriacao: dataCriacao ?? this.dataCriacao,
@@ -95,7 +89,7 @@ class Profile {
 
   @override
   String toString() {
-    return 'Profile(id: $id, nome: $nome, dataNascimento: $dataNascimento, genero: $genero, peso: $peso, caminhoImagem: $caminhoImagem, deletado: $deletado)';
+    return 'Profile(id: $id, nome: $nome, dataNascimento: $dataNascimento, genero: $genero, caminhoImagem: $caminhoImagem, deletado: $deletado)';
   }
 
   @override

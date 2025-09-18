@@ -21,12 +21,17 @@ class DatabaseController {
     return await openDatabase(
       path,
       version: 4,
-      onCreate: _createDB,
+      onCreate: (db, version) async {
+        // 1. Cria o esquema da primeira versão
+        await _createDBSchemaV1(db); 
+        // 2. Executa todas as migrações desde a v1 até a versão final
+        await _onUpgrade(db, 1, version);
+      },
       onUpgrade: _onUpgrade,
     );
   }
 
-  Future _createDB(Database db, int version) async {
+  Future _createDBSchemaV1(Database db) async {
     // Tabela de medicamentos
     await db.execute('''
       CREATE TABLE tblMedicamentos ( 
@@ -74,10 +79,9 @@ class DatabaseController {
         case 4:
           await _migrateToV4(db);
           break;
-        // Adicione novos 'cases' aqui para futuras versões.
-        // case 5:
-        //   await _migrateToV5(db);
-        //   break;
+        case 5:
+          await _migrateToV5(db);
+          break;
       }
     }
 
@@ -88,13 +92,6 @@ class DatabaseController {
     final batch = db.batch();
 
     print("Migração da v1 para v2...");
-
-    // Alterações na tblMedicamentos
-    // NOTA: SQLite não permite renomear colunas em todas as versões.
-    // O comando 'RENAME COLUMN' é mais recente. A maneira mais segura seria criar uma
-    // nova tabela, copiar os dados e renomear, mas para simplicidade, usaremos o ALTER.
-    // Assumindo que a coluna se chamava 'quantidade' e agora é 'estoque'.
-    // Se sua tabela já tinha 'estoque', este comando não é necessário.
     batch.execute(
       'ALTER TABLE tblMedicamentos RENAME COLUMN quantidade TO estoque;',
     );
@@ -165,13 +162,32 @@ class DatabaseController {
       nome TEXT NOT NULL,
       dataNascimento TEXT NULL,
       genero TEXT NULL,
-      peso REAL NULL,
       caminhoImagem TEXT NULL,
       deletado INTEGER DEFAULT 0,
       dataCriacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       dataAtualizacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   ''');
+
+
+    // Cria a nova tabela de dados de saúde (Altura, Peso, Glicose, Pressão Arterial, Pulso, etc.)
+    batch.execute('''
+    CREATE TABLE tblDadosSaude (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      idPerfil INTEGER NOT NULL,
+      tipo TEXT NOT NULL,
+      valor REAL NULL,
+      valorSistolica REAL NULL,
+      valorDiastolica REAL NULL,
+      unidade TEXT NULL,
+      observacao TEXT NULL,
+      dataRegistro TEXT NOT NULL,
+      deletado INTEGER DEFAULT 0,
+      dataCriacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      dataAtualizacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (idPerfil) REFERENCES tblPerfil (id) ON DELETE CASCADE
+    )
+    ''');
 
     // Adiciona a referência de perfil às tabelas existentes
     batch.execute(
@@ -185,7 +201,7 @@ class DatabaseController {
     print("Migração para v3 concluída.");
   }
 
-  /// Migração da v3 para v4: Adiciona a tabela para controle de doses tomadas.
+  /// Migração da v3 para v4: Adiciona a tabela para controle de doses tomadas. Até qaqui o Incremento 2 do projeto está feito.
   Future<void> _migrateToV4(Database db) async {
     final batch = db.batch();
 
@@ -210,69 +226,12 @@ class DatabaseController {
     print("Migração para v4 concluída.");
   }
 
-  // METODO DE DEBUG DOS CAMPOS DA TABELA
-  Future<void> _inspectTable(Database db, String tableName) async {
-    print("\n--- Inspecionando a tabela: '$tableName' ---");
-    try {
-      // 1. Verifica a ESTRUTURA (colunas)
-      final tableInfo = await db.rawQuery('PRAGMA table_info($tableName);');
-      print("Estrutura (Colunas):");
-      if (tableInfo.isEmpty) {
-        print("  (A tabela não existe ou não tem colunas)");
-      } else {
-        for (var column in tableInfo) {
-          print(
-            "  - Nome: ${column['name']}, Tipo: ${column['type']}, Nulo: ${column['notnull'] == 0}",
-          );
-        }
-      }
+  /// Migração da v4 para v5: Adiciona a coluna de horário agendado na tabela de doses tomadas.
+  Future<void> _migrateToV5(Database db) async {
+    final batch = db.batch();
 
-      // 2. Verifica os DADOS (as 5 primeiras linhas)
-      final sampleData = await db.query(tableName, limit: 5);
-      print("\nAmostra de Dados (até 5 linhas):");
-      if (sampleData.isEmpty) {
-        print("  (A tabela está vazia)");
-      } else {
-        for (var row in sampleData) {
-          print("  - $row");
-        }
-      }
-    } catch (e) {
-      print("  Erro ao inspecionar a tabela '$tableName': $e");
-    }
-    print("--- Fim da inspeção de '$tableName' ---\n");
+    await batch.commit();
+    print("Migração para v5 concluída.");
   }
 
-  // METODO DE DEBUG DOS DADOS DA TABELA
-  Future<void> debugPrintTableData(Database db, String tableName) async {
-    print("\n--- 🕵️  [DEBUG] Conteúdo da Tabela: '$tableName' 🕵️ ---");
-    try {
-      // 1. Executa a query para buscar todos os dados
-      final List<Map<String, dynamic>> results = await db.query(tableName);
-
-      // 2. Verifica se a tabela está vazia
-      if (results.isEmpty) {
-        print("|| A tabela está vazia ou não existe. ||");
-        print("--- Fim do conteúdo de '$tableName' ---\n");
-        return;
-      }
-
-      // 3. Monta e imprime o cabeçalho com os nomes das colunas
-      final columns = results.first.keys;
-      final header = columns.map((col) => col.padRight(15)).join(' | ');
-      print(header);
-      print('-' * header.length); // Linha separadora
-
-      // 4. Itera sobre cada linha e imprime os dados
-      for (final row in results) {
-        final rowValues = columns
-            .map((col) => (row[col]?.toString() ?? 'NULL').padRight(15))
-            .join(' | ');
-        print(rowValues);
-      }
-    } catch (e) {
-      print("🚨 Erro ao ler a tabela '$tableName': $e");
-    }
-    print("--- Fim do conteúdo de '$tableName' ---\n");
-  }
 }

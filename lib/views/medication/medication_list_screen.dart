@@ -43,7 +43,7 @@ class MedicationListScreen extends GetView<MedicationController> {
       body: Column(
         children: [
           if (!showAppBar) ...[
-            const AppHeaderWidget(), // Mantido
+            AppHeaderWidget(), // Remove const para permitir rebuilds
           ],
           // Barra de pesquisa
           Padding(
@@ -383,14 +383,7 @@ class MedicationListScreen extends GetView<MedicationController> {
   }
 
   IconData _getMedicationIcon(MedicationType type) {
-    switch (type) {
-      case MedicationType.comprimido:
-        return Icons.medication;
-      case MedicationType.liquido:
-        return Icons.water_drop_outlined;
-      case MedicationType.injecao:
-        return Icons.colorize;
-    }
+    return type.icon;
   }
 
   void _clearSearch() {

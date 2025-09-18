@@ -16,7 +16,6 @@ class AddProfileScreen extends StatefulWidget {
 class _AddProfileScreenState extends State<AddProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nomeController = TextEditingController();
-  final _pesoController = TextEditingController();
 
   DateTime? _dataNascimento;
 
@@ -28,7 +27,6 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
   @override
   void dispose() {
     _nomeController.dispose();
-    _pesoController.dispose();
     super.dispose();
   }
 
@@ -193,15 +191,6 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
           },
         ),
 
-        const SizedBox(height: 20),
-
-        // Peso
-        WidgetsDefault.buildTextField(
-          controller: _pesoController,
-          label: 'Peso (kg) *',
-          hint: 'Ex: 70',
-          keyboardType: TextInputType.numberWithOptions(decimal: true),
-        ),
       ],
     );
   }
@@ -304,17 +293,10 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
       dataNascimentoISO = _dataNascimento!.toIso8601String();
     }
 
-    // Converte peso
-    double? peso;
-    if (_pesoController.text.isNotEmpty) {
-      peso = double.tryParse(_pesoController.text.replaceAll(',', '.'));
-    }
-
     final profile = Profile(
       nome: _nomeController.text.trim(),
       dataNascimento: dataNascimentoISO,
       genero: _selectedGenero,
-      peso: peso,
       caminhoImagem: _imagePath,
     );
 

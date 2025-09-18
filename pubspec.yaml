@@ -1,7 +1,7 @@
 name: app_remedio
 description: "A new Flutter project."
 publish_to: 'none'
-version: 0.2.0
+version: 0.2.2
 
 environment:
   sdk: ^3.9.0
@@ -20,6 +20,7 @@ dependencies:
   path_provider: ^2.1.5 # Para salvar imagens do dispositivo
   local_auth: ^2.1.8 # Biometria - Permite usar a autenticação biométrica/senha do dispositivo
   scrollable_positioned_list: ^0.3.8 # Para a rolagem da lista de datas na tela de agendamentos
+  package_info_plus: ^9.0.0
 
 dev_dependencies:
   flutter_test:

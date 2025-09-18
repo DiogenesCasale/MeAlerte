@@ -19,10 +19,11 @@ class _MainLayoutState extends State<MainLayout> {
 
   late int _initialIndex;
 
-  final List<Widget> _screens = [
+  // Lista de telas sem const para permitir rebuild dinâmico
+  List<Widget> get _screens => [
     const ScheduleListScreen(showAppBar: false),
     const MedicationListScreen(showAppBar: false),
-    const ProfileScreen(showBackButton: false),
+    ProfileScreen(showBackButton: false), // Sem const para permitir atualizações
   ];
 
   void _onTabTapped(int index) {

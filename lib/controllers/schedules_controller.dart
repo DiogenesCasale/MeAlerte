@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:app_remedio/controllers/database_controller.dart';
+import 'package:app_remedio/controllers/medication_controller.dart';
 import 'package:app_remedio/models/medication_model.dart';
 import 'package:app_remedio/models/scheduled_medication_model.dart';
 import 'package:app_remedio/models/taken_dose_model.dart';
@@ -105,12 +106,46 @@ class SchedulesController extends GetxController {
     );
 
     await db.insert('tblDosesTomadas', takenDose.toMap());
+    
+    // Reduz o estoque do medicamento
+    try {
+      final medicationController = Get.find<MedicationController>();
+      await medicationController.reduceStock(dose.idMedicamento, dose.dose);
+    } catch (e) {
+      print('Erro ao reduzir estoque: $e');
+      // Continua mesmo se houver erro na redução do estoque
+    }
+    
     await fetchSchedulesForSelectedDate();
   }
 
   /// Desmarca uma dose como tomada (remove do registro)
   Future<void> unmarkDoseAsTaken(int takenDoseId) async {
     final db = await _dbController.database;
+    
+    // Busca os dados da dose tomada antes de deletar para restaurar o estoque
+    final takenDoseResult = await db.rawQuery('''
+      SELECT td.idAgendamento, s.idMedicamento, s.dose
+      FROM tblDosesTomadas td
+      INNER JOIN tblMedicamentosAgendados s ON td.idAgendamento = s.id
+      WHERE td.id = ? AND td.deletado = 0
+    ''', [takenDoseId]);
+    
+    if (takenDoseResult.isNotEmpty) {
+      final takenDoseData = takenDoseResult.first;
+      final medicationId = takenDoseData['idMedicamento'] as int;
+      final dose = takenDoseData['dose'] as double;
+      
+      // Restaura o estoque do medicamento
+      try {
+        final medicationController = Get.find<MedicationController>();
+        await medicationController.restoreStock(medicationId, dose);
+      } catch (e) {
+        print('Erro ao restaurar estoque: $e');
+        // Continua mesmo se houver erro na restauração do estoque
+      }
+    }
+    
     await db.update(
       'tblDosesTomadas',
       {'deletado': 1, 'dataAtualizacao': DateTime.now().toIso8601String()},
@@ -220,18 +255,29 @@ class SchedulesController extends GetxController {
         return;
       }
 
-      // Busca todas as doses tomadas para a data selecionada
+      // Busca todas as doses tomadas e excluídas para a data selecionada
       final selectedDateStr = DateFormat('yyyy-MM-dd').format(selectedDate.value);
       final takenDosesResult = await db.rawQuery('''
-        SELECT idAgendamento, horarioAgendado, id as takenDoseId
+        SELECT idAgendamento, horarioAgendado, id as takenDoseId, observacao, deletado
         FROM tblDosesTomadas 
-        WHERE dataTomada = ? AND idPerfil = ? AND deletado = 0
+        WHERE dataTomada = ? AND idPerfil = ?
       ''', [selectedDateStr, profileController.currentProfile.value!.id]);
 
       final takenDosesMap = <String, int>{};
+      final excludedDosesSet = <String>{};
+      
       for (var taken in takenDosesResult) {
         final key = '${taken['idAgendamento']}_${taken['horarioAgendado']}';
-        takenDosesMap[key] = taken['takenDoseId'] as int;
+        final isDeleted = (taken['deletado'] as int) == 1;
+        final observation = taken['observacao'] as String?;
+        
+        if (isDeleted && observation == 'DOSE_EXCLUIDA_INDIVIDUALMENTE') {
+          // Esta dose foi excluída individualmente
+          excludedDosesSet.add(key);
+        } else if (!isDeleted) {
+          // Esta dose foi tomada normalmente
+          takenDosesMap[key] = taken['takenDoseId'] as int;
+        }
       }
       
       //await _dbController.debugPrintTableData(db, 'tblMedicamentosAgendados');
@@ -350,6 +396,7 @@ class SchedulesController extends GetxController {
                 
                 final todayDose = TodayDose(
                   scheduledMedicationId: scheduled.id!,
+                  idMedicamento: scheduled.idMedicamento,
                   medicationName: scheduled.medicationName!,
                   dose: scheduled.dose,
                   scheduledTime: doseTime,
@@ -377,5 +424,115 @@ class SchedulesController extends GetxController {
     } finally {
       isLoading(false);
     }
+  }
+
+  /// Exclui uma dose específica de um dia específico (cria uma exceção)
+  Future<void> deleteSpecificDose(int scheduledMedicationId, DateTime doseDateTime) async {
+    final db = await _dbController.database;
+    
+    final profileController = Get.find<ProfileController>();
+    final currentProfile = profileController.currentProfile.value;
+    
+    if (currentProfile?.id == null) {
+      throw Exception('Nenhum perfil selecionado');
+    }
+    
+    final dateStr = DateFormat('yyyy-MM-dd').format(doseDateTime);
+    final timeStr = DateFormat('HH:mm').format(doseDateTime);
+    
+    // Verifica se já existe um registro de dose tomada para este horário
+    final existingDose = await db.rawQuery('''
+      SELECT id FROM tblDosesTomadas 
+      WHERE idAgendamento = ? AND dataTomada = ? AND horarioAgendado = ? AND deletado = 0
+    ''', [scheduledMedicationId, dateStr, timeStr]);
+    
+    if (existingDose.isNotEmpty) {
+      // Se existe, marca como deletado (significa que foi "pulada"/excluída)
+      await db.update(
+        'tblDosesTomadas',
+        {
+          'observacao': 'DOSE_EXCLUIDA_INDIVIDUALMENTE',
+          'deletado': 1,
+          'dataAtualizacao': DateTime.now().toIso8601String(),
+        },
+        where: 'id = ?',
+        whereArgs: [existingDose.first['id']],
+      );
+    } else {
+      // Se não existe, cria um registro especial que marca esta dose como "pulada"
+      await db.insert('tblDosesTomadas', {
+        'idAgendamento': scheduledMedicationId,
+        'dataTomada': dateStr,
+        'horarioTomada': timeStr,
+        'horarioAgendado': timeStr,
+        'idPerfil': currentProfile!.id,
+        'observacao': 'DOSE_EXCLUIDA_INDIVIDUALMENTE',
+        'deletado': 1, // Marca como deletado/pulado
+        'dataCriacao': DateTime.now().toIso8601String(),
+        'dataAtualizacao': DateTime.now().toIso8601String(),
+      });
+    }
+    
+    await fetchSchedulesForSelectedDate();
+  }
+
+  /// Atualiza uma dose específica (dose, observação, etc.)
+  Future<void> updateSpecificDose(TodayDose dose, {
+    double? newDose,
+    String? newObservacao,
+    DateTime? newTime,
+  }) async {
+    final db = await _dbController.database;
+    
+    final profileController = Get.find<ProfileController>();
+    final currentProfile = profileController.currentProfile.value;
+    
+    if (currentProfile?.id == null) {
+      throw Exception('Nenhum perfil selecionado');
+    }
+    
+    final dateStr = DateFormat('yyyy-MM-dd').format(dose.scheduledTime);
+    final originalTimeStr = DateFormat('HH:mm').format(dose.scheduledTime);
+    final newTimeStr = newTime != null 
+      ? DateFormat('HH:mm').format(newTime)
+      : originalTimeStr;
+    
+    // Primeiro, marcar a dose original como "excluída" para este dia específico
+    await deleteSpecificDose(dose.scheduledMedicationId, dose.scheduledTime);
+    
+    // Depois, criar um registro de dose "tomada" com os novos valores
+    // Isso substitui efetivamente a dose original para este dia específico
+    await db.insert('tblDosesTomadas', {
+      'idAgendamento': dose.scheduledMedicationId,
+      'dataTomada': dateStr,
+      'horarioTomada': newTimeStr,
+      'horarioAgendado': originalTimeStr,
+      'idPerfil': currentProfile!.id,
+      'observacao': 'DOSE_EDITADA: ${newDose ?? dose.dose} - ${newObservacao ?? dose.observacao ?? ''}',
+      'deletado': 0, // Esta é uma dose "real" editada
+      'dataCriacao': DateTime.now().toIso8601String(),
+      'dataAtualizacao': DateTime.now().toIso8601String(),
+    });
+    
+    await fetchSchedulesForSelectedDate();
+  }
+
+  /// Obtém detalhes de um agendamento específico
+  Future<ScheduledMedication?> getScheduledMedicationById(int id) async {
+    final db = await _dbController.database;
+    
+    final result = await db.rawQuery('''
+      SELECT 
+        s.id, s.idPerfil, s.hora, s.dose, s.intervalo, s.dias, s.dataInicio, s.dataFim, s.paraSempre, s.observacao, s.idMedicamento, s.dataCriacao, s.deletado,
+        m.nome as medicationName, m.caminhoImagem as caminhoImagem
+      FROM tblMedicamentosAgendados s
+      INNER JOIN tblMedicamentos m ON s.idMedicamento = m.id
+      WHERE s.id = ? AND s.deletado = 0
+    ''', [id]);
+    
+    if (result.isNotEmpty) {
+      return ScheduledMedication.fromMapWithMedication(result.first);
+    }
+    return null;
   }
 }

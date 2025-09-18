@@ -4,10 +4,12 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:app_remedio/views/main_layout.dart';
+import 'package:app_remedio/controllers/global_state_controller.dart';
 import 'package:app_remedio/controllers/theme_controller.dart';
 import 'package:app_remedio/controllers/medication_controller.dart';
 import 'package:app_remedio/controllers/schedules_controller.dart';
 import 'package:app_remedio/controllers/profile_controller.dart';
+import 'package:app_remedio/controllers/health_data_controller.dart';
 import 'package:app_remedio/utils/constants.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,11 +21,13 @@ void main() {
   ));
   
   // Inicializa os controllers globais
-  // IMPORTANTE: ProfileController deve ser inicializado PRIMEIRO
+  // IMPORTANTE: GlobalStateController deve ser inicializado PRIMEIRO
+  Get.put(GlobalStateController());
   Get.put(ThemeController());
   Get.put(ProfileController());
   Get.put(MedicationController());
   Get.put(SchedulesController());
+  Get.put(HealthDataController());
   
   runApp(const MeAlerteApp());
 }

@@ -44,7 +44,6 @@ class _EditMedicationScreenState extends State<EditMedicationScreen> {
 
     // Preenche os campos com os dados existentes do medicamento
     _nameController.text = widget.medication.nome;
-    _stockController.text = widget.medication.estoque.toString();
     _observacaoController.text = widget.medication.observacao ?? '';
     _selectedType = widget.medication.tipo;
     _savedImagePath = widget.medication.caminhoImagem;

@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:app_remedio/controllers/profile_controller.dart';
 
 class ProfileImageWidget extends StatelessWidget {
   final String? imagePath;
@@ -17,30 +19,38 @@ class ProfileImageWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: showBorder
-              ? Border.all(
-                  color: Theme.of(context).primaryColor.withOpacity(0.3),
-                  width: 2,
-                )
-              : null,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+    return Obx(() {
+      // Força rebuild quando perfil muda
+      final profileController = Get.find<ProfileController>();
+      profileController.currentProfile.value;
+      
+      return GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: showBorder
+                ? Border.all(
+                    color: Theme.of(context).primaryColor.withOpacity(0.3),
+                    width: 2,
+                  )
+                : null,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: ClipOval(
+            child: _buildImage(),
+          ),
         ),
-        child: ClipOval(child: _buildImage()),
-      ),
-    );
+      );
+    });
   }
 
   Widget _buildImage() {
@@ -52,34 +62,44 @@ class ProfileImageWidget extends StatelessWidget {
           width: size,
           height: size,
           fit: BoxFit.cover,
-          key: ValueKey('asset_${imagePath}'),
+          key: ValueKey('asset_$imagePath'),
           errorBuilder: (context, error, stackTrace) {
             return _buildDefaultImage();
           },
         );
-      } else {
-        // Para arquivos locais - verifica se existe antes de carregar
-        final file = File(imagePath!);
-        if (file.existsSync()) {
-          return Image.file(
-            file,
-            width: size,
-            height: size,
-            fit: BoxFit.cover,
-            // MUDANÇA PRINCIPAL AQUI: Use uma chave estável baseada no caminho.
-            key: ValueKey('file_$imagePath'),
-            // REMOVA cacheWidth e cacheHeight, deixe o Flutter gerenciar.
-            errorBuilder: (context, error, stackTrace) {
-              // Adicione um print para depurar erros de carregamento
-              print("Erro ao carregar imagem em ProfileImageWidget: $error");
-              return _buildDefaultImage();
+        } else {
+          // Para arquivos locais - verifica se existe antes de carregar
+          final file = File(imagePath!);
+          
+          // MELHOR TRATAMENTO: Usa Future para verificar de forma assíncrona
+          return FutureBuilder<bool>(
+            future: file.exists(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                // Mostra loading enquanto verifica
+                return _buildDefaultImage();
+              }
+              
+              if (snapshot.data == true) {
+                // Arquivo existe, carrega normalmente
+                return Image.file(
+                  file,
+                  width: size,
+                  height: size,
+                  fit: BoxFit.cover,
+                  key: ValueKey('profile_file_$imagePath'),
+                  errorBuilder: (context, error, stackTrace) {
+                    // Se der erro mesmo o arquivo existindo, mostra padrão
+                    return _buildDefaultImage();
+                  },
+                );
+              } else {
+                // Arquivo não existe, mostra imagem padrão
+                return _buildDefaultImage();
+              }
             },
           );
-        } else {
-          // Arquivo não existe, mostra imagem padrão
-          return _buildDefaultImage();
         }
-      }
     }
 
     // Imagem padrão

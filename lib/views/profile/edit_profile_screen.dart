@@ -18,7 +18,6 @@ class EditProfileScreen extends StatefulWidget {
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nomeController;
-  late final TextEditingController _pesoController;
 
   DateTime? _dataNascimento;
   String? _selectedGenero;
@@ -48,16 +47,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       }
     }
 
-    // Peso
-    _pesoController = TextEditingController(
-      text: widget.profile.peso?.toString() ?? '',
-    );
   }
 
   @override
   void dispose() {
     _nomeController.dispose();
-    _pesoController.dispose();
     super.dispose();
   }
 
@@ -121,6 +115,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget _buildPhotoSection(ProfileController controller) {
     return Column(
       children: [
+        // PADRÃO SIMPLES: Usa _imagePath localmente para preview, mas sem Obx interno
         ProfileImageWidget(
           imagePath: _imagePath,
           size: 120,
@@ -138,7 +133,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 style: TextStyle(color: primaryColor),
               ),
             ),
-            if (_imagePath != null) ...[
+            if (_imagePath != null && _imagePath!.isNotEmpty) ...[
               const SizedBox(width: 16),
               TextButton.icon(
                 onPressed: _removeImage,
@@ -151,6 +146,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ],
           ],
         ),
+        const SizedBox(height: 8),
+        // Debug info para verificar se _imagePath está sendo atualizado
+        if (_imagePath != null && _imagePath!.isNotEmpty)
+          Text(
+            'Foto selecionada: ${_imagePath!.split('/').last}',
+            style: TextStyle(
+              fontSize: 12,
+              color: primaryColor.withOpacity(0.7),
+            ),
+          ),
       ],
     );
   }
@@ -242,15 +247,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           },
         ),
 
-        const SizedBox(height: 20),
-
-        // Peso
-        WidgetsDefault.buildTextField(
-          controller: _pesoController,
-          label: 'Peso (kg) *',
-          hint: 'Ex: 70',
-          keyboardType: TextInputType.numberWithOptions(decimal: true)
-        ),
       ],
     );
   }
@@ -394,12 +390,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       dataNascimentoISO = _dataNascimento!.toIso8601String();
     }
 
-    // Converte peso
-    double? peso;
-    if (_pesoController.text.isNotEmpty) {
-      peso = double.tryParse(_pesoController.text.replaceAll(',', '.'));
-    }
-
     // Remove imagem anterior se foi alterada
     if (_originalImagePath != null &&
         _originalImagePath != _imagePath &&
@@ -411,7 +401,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       nome: _nomeController.text.trim(),
       dataNascimento: dataNascimentoISO,
       genero: _selectedGenero,
-      peso: peso,
       caminhoImagem: _imagePath,
     );
 

@@ -3,6 +3,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app_remedio/utils/constants.dart';
+import 'package:app_remedio/controllers/global_state_controller.dart';
 
 // Enum para clareza e segurança de tipos ao escolher o tema.
 enum AppThemeMode { light, dark, system }
@@ -59,15 +60,46 @@ class ThemeController extends GetxController {
         modeToApply = ThemeMode.system;
         break;
     }
+    
+    // Atualiza as cores dinâmicas globais ANTES de mudar o tema
+    updateTheme(isDarkMode);
+    
+    // NOTIFICA SISTEMA GLOBAL DE MUDANÇA DE TEMA
+    try {
+      final globalState = Get.find<GlobalStateController>();
+      globalState.notifyThemeUpdate();
+    } catch (e) {
+      print('GlobalStateController não encontrado: $e');
+    }
+    
+    // SOLUÇÃO MAIS RADICAL: Força restart completo do GetMaterialApp
+    Get.forceAppUpdate();
+    
     // Esta é a função correta do GetX para mudar o tema de forma reativa.
     Get.changeThemeMode(modeToApply);
     
-    // Atualiza as cores dinâmicas globais
-    updateTheme(isDarkMode);
+    // Força refresh dos observables
+    themeMode.refresh();
     
-    // 'update()' notifica os widgets que usam GetBuilder sobre a mudança,
-    // caso você precise atualizar algo que não seja reativo (Obx/GetX).
+    // 'update()' notifica os widgets que usam GetBuilder sobre a mudança
     update();
+    
+    // Múltiplos rebuilds para garantir propagação IMEDIATA
+    Future.delayed(const Duration(milliseconds: 5), () {
+      Get.forceAppUpdate();
+      update();
+      themeMode.refresh();
+    });
+    
+    Future.delayed(const Duration(milliseconds: 25), () {
+      Get.forceAppUpdate();
+      update();
+    });
+    
+    Future.delayed(const Duration(milliseconds: 75), () {
+      update();
+      themeMode.refresh();
+    });
   }
 
   /// Define o modo de tema e salva a preferência.

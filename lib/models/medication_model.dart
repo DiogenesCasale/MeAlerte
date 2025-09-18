@@ -1,11 +1,18 @@
-enum MedicationType {
-  comprimido('Comprimido', 'comp.'),
-  liquido('Líquido', 'ml'),
-  injecao('Injeção', 'amp.');
+import 'package:flutter/material.dart';
 
-  const MedicationType(this.displayName, this.unit);
+enum MedicationType {
+  comprimido('Comprimido', 'comp.', Icons.local_pharmacy),
+  liquido('Líquido', 'ml', Icons.science),
+  injecao('Injeção', 'amp.', Icons.vaccines),
+  po('Pó', 'g', Icons.medication),
+  inalador('Inalador', 'ml', Icons.medical_services),
+  gotas('Gotas', 'ml', Icons.water_drop),
+  outros('Outros', 'ml', Icons.health_and_safety);
+
+  const MedicationType(this.displayName, this.unit, this.icon);
   final String displayName;
   final String unit;
+  final IconData icon;
 }
 
 class Medication {
@@ -55,6 +62,14 @@ class Medication {
         return MedicationType.liquido;
       case 'injecao':
         return MedicationType.injecao;
+      case 'po':
+        return MedicationType.po;
+      case 'inalador':
+        return MedicationType.inalador;
+      case 'gotas':
+        return MedicationType.gotas;
+      case 'outros':
+        return MedicationType.outros;
       default:
         return MedicationType.comprimido;
     }

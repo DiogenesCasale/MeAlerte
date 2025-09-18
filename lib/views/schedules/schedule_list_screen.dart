@@ -3,8 +3,10 @@ import 'package:app_remedio/views/medication/add_medication_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:app_remedio/controllers/schedules_controller.dart';
+import 'package:app_remedio/controllers/medication_controller.dart';
 import 'package:app_remedio/controllers/theme_controller.dart';
 import 'package:app_remedio/models/scheduled_medication_model.dart';
+import 'package:app_remedio/models/medication_model.dart';
 import 'package:app_remedio/views/schedules/add_schedule_screen.dart';
 import 'package:app_remedio/views/schedules/edit_schedule_screen.dart';
 import 'package:app_remedio/utils/constants.dart';
@@ -56,7 +58,7 @@ class ScheduleListScreen extends GetView<SchedulesController> {
         children: [
           // Cabeçalho e seleção de dias (só mostra quando não tem AppBar)
           if (!showAppBar) ...[
-            const AppHeaderWidget(),
+            AppHeaderWidget(), // Remove const para permitir rebuilds
             const DateSelectorWidget(),
           ],
 
@@ -150,210 +152,397 @@ class ScheduleListScreen extends GetView<SchedulesController> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Handle visual do modal
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 24),
-                decoration: BoxDecoration(
-                  color: textColor.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-
-            // NOVO: Row para imagem e detalhes
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Imagem do Medicamento
-                const SizedBox(width: 2),
-
-                // Detalhes (Nome, Dose, Horário)
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        dose.medicationName,
-                        style: heading1Style.copyWith(
-                          fontSize: 24,
-                        ), // Fonte maior
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Dose: ${dose.dose % 1 == 0 ? dose.dose.toInt().toString() : dose.dose.toString()}',
-                        style: bodyTextStyle.copyWith(
-                          fontSize: 16,
-                        ), // Fonte maior
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Horário: ${DateFormat('HH:mm').format(dose.scheduledTime)}',
-                        style: bodyTextStyle.copyWith(
-                          fontSize: 16,
-                        ), // Fonte maior
-                      ),
-                    ],
+      isScrollControlled: true,
+      builder: (ctx) => SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Handle visual do modal
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: textColor.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
+              ),
 
-                if (dose.caminhoImagem != null &&
-                    dose.caminhoImagem!.isNotEmpty)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.file(
-                      File(dose.caminhoImagem!),
-                      width: 250,
-                      height: 100,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        width: 250,
-                        height: 100,
+              // Imagem do medicamento - movida para o topo e maior
+              if (dose.caminhoImagem != null && dose.caminhoImagem!.isNotEmpty)
+                Center(
+                  child: GestureDetector(
+                    onTap: () => _showFullScreenImage(context, dose.caminhoImagem!),
+                    child: Hero(
+                      tag: 'medicationImage_${dose.scheduledMedicationId}',
+                      child: Container(
+                        width: 200,
+                        height: 200,
+                        margin: const EdgeInsets.only(bottom: 20),
                         decoration: BoxDecoration(
                           color: backgroundColor,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
-                        child: Icon(
-                          Icons.medication_liquid,
-                          color: textColor.withOpacity(0.3),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Image.file(
+                            File(dose.caminhoImagem!),
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) => Icon(
+                              Icons.medication_liquid,
+                              color: textColor.withOpacity(0.3),
+                              size: 80,
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
-              ],
-            ),
+                ),
 
-            const SizedBox(height: 24),
-
-            // NOVO: Divisor e Observações no rodapé
-            if (dose.observacao != null && dose.observacao!.isNotEmpty) ...[
-              const Divider(),
-              const SizedBox(height: 12),
+              // Nome do medicamento
               Text(
-                'Observações:',
-                style: bodyTextStyle.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: textColor.withOpacity(0.8),
-                ),
+                dose.medicationName,
+                style: heading1Style.copyWith(fontSize: 24),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 4),
-              Text(
-                dose.observacao!,
-                style: bodyTextStyle.copyWith(
-                  fontStyle: FontStyle.italic,
-                  color: textColor.withOpacity(0.7),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
+              const SizedBox(height: 20),
 
-            // Status atual da medicação
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: _getStatusColor(dose.status).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: _getStatusColor(dose.status).withValues(alpha: 0.3),
-                ),
-              ),
-              child: Row(
+              // Informações da dose e horário
+              Row(
                 children: [
-                  Icon(
-                    _getStatusIcon(dose.status),
-                    color: _getStatusColor(dose.status),
-                    size: 20,
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: primaryColor.withOpacity(0.3)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.medication, color: primaryColor, size: 20),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Estoque',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: textColor.withOpacity(0.7),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${dose.dose % 1 == 0 ? dose.dose.toInt().toString() : dose.dose.toString()}',
+                            style: bodyTextStyle.copyWith(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Status: ${dose.status.displayName}',
-                    style: TextStyle(
-                      color: _getStatusColor(dose.status),
-                      fontWeight: FontWeight.w600,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: primaryColor.withOpacity(0.3)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.access_time, color: primaryColor, size: 20),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Horário',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: textColor.withOpacity(0.7),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            DateFormat('HH:mm').format(dose.scheduledTime),
+                            style: bodyTextStyle.copyWith(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
               ),
-            ),
-            
-            const SizedBox(height: 16),
 
-            // Botões de ação (dinâmicos baseados no status)
-            OutlinedButton.icon(
-              icon: Icon(
-                dose.status == MedicationStatus.taken 
-                    ? Icons.remove_circle_outline 
-                    : Icons.check,
-                color: dose.status == MedicationStatus.taken 
-                    ? Colors.orange 
-                    : Colors.green,
+              const SizedBox(height: 16),
+
+              // Aviso sobre estoque - no lugar onde era a imagem
+              FutureBuilder<Medication?>(
+                future: Get.find<MedicationController>().getMedicationById(dose.idMedicamento),
+                builder: (context, snapshot) {
+                  if (snapshot.hasData && snapshot.data != null) {
+                    final medication = snapshot.data!;
+                    return FutureBuilder<bool>(
+                      future: Get.find<MedicationController>().isLowStock(dose.idMedicamento),
+                      builder: (context, lowStockSnapshot) {
+                        final isLowStock = lowStockSnapshot.data ?? false;
+                        return FutureBuilder<double>(
+                          future: Get.find<MedicationController>().getDaysRemaining(dose.idMedicamento),
+                          builder: (context, daysSnapshot) {
+                            final daysRemaining = daysSnapshot.data ?? 0;
+                            
+                            Color stockColor = Colors.green;
+                            IconData stockIcon = Icons.inventory;
+                            String stockMessage = 'Estoque: ${medication.estoque} unidades';
+                            
+                            if (isLowStock) {
+                              stockColor = medication.estoque <= 0 ? Colors.red : Colors.orange;
+                              stockIcon = medication.estoque <= 0 ? Icons.warning : Icons.warning_amber;
+                              
+                              if (medication.estoque <= 0) {
+                                stockMessage = 'ATENÇÃO: Medicamento em falta!';
+                              } else {
+                                final daysText = daysRemaining < 1 
+                                  ? "menos de 1 dia" 
+                                  : "${daysRemaining.toStringAsFixed(1)} dias";
+                                stockMessage = 'ATENÇÃO: Estoque baixo!\n${medication.estoque} unidades (~$daysText restantes)';
+                              }
+                            }
+                            
+                            return Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: stockColor.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: stockColor.withOpacity(0.3)),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(stockIcon, color: stockColor, size: 24),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      stockMessage,
+                                      style: TextStyle(
+                                        color: stockColor,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    );
+                  }
+                  return Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.inventory, color: Colors.grey, size: 24),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Carregando informações do estoque...',
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
-              label: Text(
-                dose.status == MedicationStatus.taken 
-                    ? 'Desmarcar como Tomado' 
-                    : 'Marcar como Tomado',
-                style: TextStyle(
-                  color: dose.status == MedicationStatus.taken 
-                      ? Colors.orange 
+
+              const SizedBox(height: 20),
+              // Divisor e Observações
+              if (dose.observacao != null && dose.observacao!.isNotEmpty) ...[
+                const Divider(),
+                const SizedBox(height: 12),
+                Text(
+                  'Observações:',
+                  style: bodyTextStyle.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: textColor.withOpacity(0.8),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  dose.observacao!,
+                  style: bodyTextStyle.copyWith(
+                    fontStyle: FontStyle.italic,
+                    color: textColor.withOpacity(0.7),
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // Status atual da medicação
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _getStatusColor(dose.status).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: _getStatusColor(dose.status).withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _getStatusIcon(dose.status),
+                      color: _getStatusColor(dose.status),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Status: ${dose.status.displayName}',
+                      style: TextStyle(
+                        color: _getStatusColor(dose.status),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Botões de ação (seu código existente)
+              OutlinedButton.icon(
+                icon: Icon(
+                  dose.status == MedicationStatus.taken
+                      ? Icons.remove_circle_outline
+                      : Icons.check,
+                  color: dose.status == MedicationStatus.taken
+                      ? Colors.orange
                       : Colors.green,
                 ),
-              ),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                side: BorderSide(
-                  color: dose.status == MedicationStatus.taken 
-                      ? Colors.orange 
-                      : Colors.green,
+                label: Text(
+                  dose.status == MedicationStatus.taken
+                      ? 'Desmarcar como Tomado'
+                      : 'Marcar como Tomado',
+                  style: TextStyle(
+                    color: dose.status == MedicationStatus.taken
+                        ? Colors.orange
+                        : Colors.green,
+                  ),
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  side: BorderSide(
+                    color: dose.status == MedicationStatus.taken
+                        ? Colors.orange
+                        : Colors.green,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
+                onPressed: () => _markAsTaken(dose),
               ),
-              onPressed: () => _markAsTaken(dose),
-            ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              icon: Icon(Icons.edit, color: primaryColor),
-              label: Text(
-                'Editar Agendamento',
-                style: TextStyle(color: primaryColor),
-              ),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                side: BorderSide(color: primaryColor),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                icon: Icon(Icons.edit, color: primaryColor),
+                label: Text(
+                  'Editar Agendamento',
+                  style: TextStyle(color: primaryColor),
                 ),
-              ),
-              onPressed: () => _editMedication(dose),
-            ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              icon: const Icon(Icons.delete, color: Colors.red),
-              label: const Text(
-                'Deletar Agendamento',
-                style: TextStyle(color: Colors.red),
-              ),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                side: const BorderSide(color: Colors.red),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  side: BorderSide(color: primaryColor),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
+                onPressed: () => _editMedication(dose),
               ),
-              onPressed: () => _deleteMedication(dose),
-            ),
-          ],
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.delete, color: Colors.red),
+                label: const Text(
+                  'Deletar Agendamento',
+                  style: TextStyle(color: Colors.red),
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  side: const BorderSide(color: Colors.red),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () => _deleteMedication(dose),
+              ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  void _showFullScreenImage(BuildContext context, String imagePath) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(10),
+          child: GestureDetector(
+            onTap: () => Navigator.of(ctx).pop(), // Fecha o dialog ao tocar
+            child: InteractiveViewer(
+              // Permite zoom e pan na imagem
+              panEnabled: true,
+              minScale: 0.5,
+              maxScale: 4.0,
+              child: Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.file(File(imagePath)),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -409,7 +598,7 @@ class ScheduleListScreen extends GetView<SchedulesController> {
   Widget _buildMedicationCard(TodayDose dose) {
     final statusColor = _getStatusColor(dose.status);
     final statusIcon = _getStatusIcon(dose.status);
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8.0),
       decoration: BoxDecoration(
@@ -425,11 +614,7 @@ class ScheduleListScreen extends GetView<SchedulesController> {
           child: Row(
             children: [
               // Indicador de status visual
-              Icon(
-                statusIcon,
-                color: statusColor,
-                size: 20,
-              ),
+              Icon(statusIcon, color: statusColor, size: 20),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -453,7 +638,10 @@ class ScheduleListScreen extends GetView<SchedulesController> {
                         const SizedBox(width: 8),
                         // Indicador de status
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: statusColor.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
@@ -500,11 +688,11 @@ class ScheduleListScreen extends GetView<SchedulesController> {
                 children: [
                   // Botão de ação baseado no status
                   _buildActionButton(
-                    icon: dose.status == MedicationStatus.taken 
-                        ? Icons.remove_circle_outline 
+                    icon: dose.status == MedicationStatus.taken
+                        ? Icons.remove_circle_outline
                         : Icons.check,
-                    color: dose.status == MedicationStatus.taken 
-                        ? Colors.orange 
+                    color: dose.status == MedicationStatus.taken
+                        ? Colors.orange
                         : Colors.green,
                     onTap: () {
                       _markAsTaken(dose);
@@ -543,7 +731,7 @@ class ScheduleListScreen extends GetView<SchedulesController> {
 
   void _markAsTaken(TodayDose dose) async {
     final schedulesController = Get.find<SchedulesController>();
-    
+
     try {
       if (dose.status == MedicationStatus.taken) {
         // Se já foi tomada, desmarca
@@ -552,7 +740,9 @@ class ScheduleListScreen extends GetView<SchedulesController> {
       } else {
         // Se não foi tomada, marca como tomada
         await schedulesController.markDoseAsTaken(dose);
-        _showCheckSuccessToast('${dose.medicationName} foi marcado como tomado');
+        _showCheckSuccessToast(
+          '${dose.medicationName} foi marcado como tomado',
+        );
       }
       Get.back();
     } catch (e) {
@@ -594,13 +784,60 @@ class ScheduleListScreen extends GetView<SchedulesController> {
   }
 
   void _deleteMedication(TodayDose dose) {
-    final schedulesController = Get.find<SchedulesController>();
+    Get.dialog(
+      AlertDialog(
+        backgroundColor: surfaceColor,
+        title: Text('Excluir Agendamento', style: heading2Style),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Como você deseja excluir o agendamento de ${dose.medicationName}?',
+              style: bodyTextStyle,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Escolha uma opção:',
+              style: TextStyle(fontWeight: FontWeight.w600, color: textColor),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: Text(
+              'Cancelar',
+              style: TextStyle(color: textColor.withOpacity(0.6)),
+            ),
+          ),
+          TextButton(
+            onPressed: () => _confirmDeleteSingle(dose),
+            child: Text(
+              'Apenas este horário',
+              style: TextStyle(color: Colors.orange),
+            ),
+          ),
+          TextButton(
+            onPressed: () => _confirmDeleteAll(dose),
+            child: Text(
+              'Todo o agendamento',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteSingle(TodayDose dose) {
+    Get.back(); // Fechar dialog anterior
     Get.dialog(
       AlertDialog(
         backgroundColor: surfaceColor,
         title: Text('Confirmar Exclusão', style: heading2Style),
         content: Text(
-          'Deseja realmente excluir o agendamento de ${dose.medicationName}?',
+          'Deseja excluir apenas este horário específico de ${dose.medicationName}?\n\nIsso criará uma exceção para este horário, mantendo os demais agendamentos.',
           style: bodyTextStyle,
         ),
         actions: [
@@ -608,13 +845,58 @@ class ScheduleListScreen extends GetView<SchedulesController> {
             onPressed: () => Get.back(),
             child: Text(
               'Cancelar',
-              style: TextStyle(color: textColor.withValues(alpha: 0.6)),
+              style: TextStyle(color: textColor.withOpacity(0.6)),
             ),
           ),
           TextButton(
             onPressed: () async {
               try {
-                Get.back(); // Fechar dialog
+                Get.back(); // Fechar dialog de confirmação
+                final schedulesController = Get.find<SchedulesController>();
+                await schedulesController.deleteSpecificDose(
+                  dose.scheduledMedicationId,
+                  dose.scheduledTime,
+                );
+                _showDeleteSuccessToast('Horário específico de ${dose.medicationName} foi excluído');
+                Get.back(); // Fechar modal principal
+              } catch (e) {
+                print('Erro ao excluir horário específico: $e');
+                _showDeleteErrorToast();
+              }
+            },
+            child: Text(
+              'Excluir apenas este',
+              style: TextStyle(color: Colors.orange),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteAll(TodayDose dose) {
+    Get.back(); // Fechar dialog anterior
+    final schedulesController = Get.find<SchedulesController>();
+    Get.dialog(
+      AlertDialog(
+        backgroundColor: surfaceColor,
+        title: Text('Confirmar Exclusão Total', style: heading2Style),
+        content: Text(
+          'Deseja excluir TODOS os agendamentos de ${dose.medicationName}?\n\nEsta ação não pode ser desfeita e removerá todo o cronograma deste medicamento.',
+          style: bodyTextStyle,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: Text(
+              'Cancelar',
+              style: TextStyle(color: textColor.withOpacity(0.6)),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              try {
+                Get.back();
                 await schedulesController.deleteScheduled(
                   dose.scheduledMedicationId,
                 );
@@ -626,7 +908,7 @@ class ScheduleListScreen extends GetView<SchedulesController> {
                 Get.back();
               }
             },
-            child: Text('Excluir', style: TextStyle(color: Colors.red)),
+            child: Text('Excluir tudo', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),

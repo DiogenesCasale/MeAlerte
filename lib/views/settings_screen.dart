@@ -2,10 +2,35 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:app_remedio/controllers/theme_controller.dart';
 import 'package:app_remedio/utils/constants.dart';
+import 'package:package_info_plus/package_info_plus.dart'; // <-- MUDANÇA 1: Importar pacote
 
-class SettingsScreen extends StatelessWidget {
+// <-- MUDANÇA 2: Converter para StatefulWidget
+class SettingsScreen extends StatefulWidget {
   final bool showBackButton;
   const SettingsScreen({super.key, this.showBackButton = true});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  // <-- MUDANÇA 3: Variável para guardar a versão
+  String _appVersion = 'Carregando...';
+
+  @override
+  void initState() {
+    super.initState();
+    // <-- MUDANÇA 4: Chamar a função para buscar a versão
+    _loadVersionInfo();
+  }
+
+  // <-- MUDANÇA 5: Função assíncrona para buscar a versão
+  Future<void> _loadVersionInfo() async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    setState(() {
+      _appVersion = packageInfo.version;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -16,8 +41,8 @@ class SettingsScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        automaticallyImplyLeading: showBackButton,
-        leading: showBackButton ? IconButton(
+        automaticallyImplyLeading: widget.showBackButton, // <-- MUDANÇA: Usar widget.
+        leading: widget.showBackButton ? IconButton( // <-- MUDANÇA: Usar widget.
           icon: Icon(Icons.arrow_back, color: textColor),
           onPressed: () => Get.back(),
         ) : null,
@@ -39,7 +64,7 @@ class SettingsScreen extends StatelessWidget {
             _buildSectionHeader('Aparência'),
             const SizedBox(height: 12),
             
-                        // Card do tema
+            // Card do tema
             Container(
               decoration: BoxDecoration(
                 color: surfaceColor,
@@ -90,38 +115,27 @@ class SettingsScreen extends StatelessWidget {
             _buildSectionHeader('Sobre'),
             const SizedBox(height: 12),
             
-                         Container(
-               decoration: BoxDecoration(
-                 color: surfaceColor,
-                 borderRadius: BorderRadius.circular(12),
-                 boxShadow: [
-                   BoxShadow(
-                     color: Colors.black.withOpacity(0.1),
-                     blurRadius: 10,
-                     offset: const Offset(0, 4),
-                   ),
-                 ],
-               ),
+            Container(
+              decoration: BoxDecoration(
+                color: surfaceColor,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
               child: Column(
                 children: [
                   _buildSettingsTile(
                     icon: Icons.info_outline,
                     title: 'Versão',
-                    subtitle: '0.2.0',
+                    // <-- MUDANÇA 6: Usar a variável de estado
+                    subtitle: _appVersion,
                     onTap: null,
                   ),
-                  // Divider(
-                  //   height: 1,
-                  //   color: Colors.grey.withOpacity(0.2),
-                  //   indent: 60,
-                  // ),
-                  // _buildSettingsTile(
-                  //   icon: Icons.privacy_tip_outlined,
-                  //   title: 'Política de Privacidade',
-                  //   onTap: () {
-                  //     // TODO: Implementar
-                  //   },
-                  // ),
                 ],
               ),
             ),
@@ -131,6 +145,9 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
+  // O resto do seu código (_buildSectionHeader, _buildSettingsTile, etc.)
+  // permanece exatamente o mesmo.
+  
   Widget _buildSectionHeader(String title) {
     return Align(
       alignment: Alignment.centerLeft,
@@ -273,4 +290,4 @@ class SettingsScreen extends StatelessWidget {
         return 'Seguir configuração do sistema';
     }
   }
-} 
+}

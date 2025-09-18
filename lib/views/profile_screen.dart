@@ -6,6 +6,8 @@ import 'package:app_remedio/widgets/profile_image_widget.dart';
 import 'package:app_remedio/views/profile/profile_list_screen.dart';
 import 'package:app_remedio/views/profile/edit_profile_screen.dart';
 import 'package:app_remedio/views/settings_screen.dart';
+import 'package:app_remedio/views/health_data/health_data_list_screen.dart';
+import 'package:app_remedio/utils/toast_service.dart';
 
 class ProfileScreen extends StatelessWidget {
   final bool showBackButton;
@@ -36,6 +38,10 @@ class ProfileScreen extends StatelessWidget {
         centerTitle: true,
       ),
       body: Obx(() {
+        // Força rebuild quando o perfil muda
+        profileController.currentProfile.value;
+        profileController.profiles.length;
+        
         final currentProfile = profileController.currentProfile.value;
         
         if (profileController.isLoading.value) {
@@ -127,17 +133,27 @@ class ProfileScreen extends StatelessWidget {
   Widget _buildProfileView(dynamic currentProfile) {
     return Padding(
       padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          // Cabeçalho do Perfil Atual
-          _buildCurrentProfileHeader(currentProfile),
+      child: SingleChildScrollView(
+        child: Column(
+          children: [
+            // Cabeçalho do Perfil Atual - com Obx para reatividade
+            Obx(() => _buildCurrentProfileHeader()),
           
           const SizedBox(height: 24),
           
           // Seção Perfil
           _buildSectionHeader('Meu Perfil'),
           const SizedBox(height: 12),
-          _buildProfileSection(currentProfile),
+          Obx(() => _buildProfileSection()),
+          
+          const SizedBox(height: 24),
+          
+          // Seção Saúde
+          _buildSectionHeader('Saúde e Acompanhamento'),
+          const SizedBox(height: 12),
+          Builder(
+            builder: (context) => _buildHealthSection(context),
+          ),
           
           const SizedBox(height: 24),
           
@@ -147,10 +163,18 @@ class ProfileScreen extends StatelessWidget {
           _buildSettingsSection(),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
-  Widget _buildCurrentProfileHeader(dynamic profile) {
+  Widget _buildCurrentProfileHeader() {
+    final profileController = Get.find<ProfileController>();
+    final currentProfile = profileController.currentProfile.value;
+    
+    if (currentProfile == null) {
+      return const SizedBox.shrink();
+    }
+    
     return Container(
       decoration: BoxDecoration(
         color: primaryColor.withOpacity(0.1),
@@ -161,7 +185,8 @@ class ProfileScreen extends StatelessWidget {
       child: Row(
         children: [
           ProfileImageWidget(
-            imagePath: profile.caminhoImagem,
+            key: ValueKey('profile_image_${currentProfile.id}_${currentProfile.caminhoImagem}'),
+            imagePath: currentProfile.caminhoImagem,
             size: 60,
           ),
           const SizedBox(width: 16),
@@ -170,17 +195,17 @@ class ProfileScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  profile.nome,
+                  currentProfile.nome,
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                     color: textColor,
                   ),
                 ),
-                if (profile.idade != null) ...[
+                if (currentProfile.idade != null) ...[
                   const SizedBox(height: 4),
                   Text(
-                    '${profile.idade} anos',
+                    '${currentProfile.idade} anos',
                     style: TextStyle(
                       fontSize: 14,
                       color: textColor.withOpacity(0.7),
@@ -223,7 +248,10 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildProfileSection(dynamic profile) {
+  Widget _buildProfileSection() {
+    final profileController = Get.find<ProfileController>();
+    final currentProfile = profileController.currentProfile.value;
+    
     return Container(
       decoration: BoxDecoration(
         color: surfaceColor,
@@ -242,7 +270,14 @@ class ProfileScreen extends StatelessWidget {
             icon: Icons.edit,
             title: 'Editar Perfil',
             subtitle: 'Alterar informações pessoais e foto',
-            onTap: () => Get.to(() => EditProfileScreen(profile: profile)),
+            onTap: currentProfile != null ? () async {
+              final result = await Get.to(() => EditProfileScreen(profile: currentProfile));
+              if (result == true) {
+                // Força atualização quando voltar da edição
+                profileController.currentProfile.refresh();
+                profileController.profiles.refresh();
+              }
+            } : null,
           ),
           _buildDivider(),
           _buildSettingsTile(
@@ -250,6 +285,60 @@ class ProfileScreen extends StatelessWidget {
             title: 'Gerenciar Perfis',
             subtitle: 'Criar, editar ou trocar entre perfis',
             onTap: () => Get.to(() => const ProfileListScreen()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHealthSection(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: surfaceColor,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          _buildSettingsTile(
+            icon: Icons.favorite_outline,
+            title: 'Dados de Saúde',
+            subtitle: 'Registrar peso, pressão, glicose e outros dados',
+            onTap: () => Get.to(() => const HealthDataListScreen()),
+          ),
+          _buildDivider(),
+          _buildSettingsTile(
+            icon: Icons.calendar_today,
+            title: 'Consultas',
+            subtitle: 'Agendar e acompanhar consultas médicas',
+            onTap: () => _showFeatureInDevelopment('Consultas', context),
+          ),
+          _buildDivider(),
+          _buildSettingsTile(
+            icon: Icons.analytics,
+            title: 'Relatórios',
+            subtitle: 'Relatórios de medicamentos e aderência',
+            onTap: () => _showFeatureInDevelopment('Relatórios', context),
+          ),
+          _buildDivider(),
+          _buildSettingsTile(
+            icon: Icons.inventory,
+            title: 'Reposições',
+            subtitle: 'Controle de reposição de medicamentos',
+            onTap: () => _showFeatureInDevelopment('Reposições', context),
+          ),
+          _buildDivider(),
+          _buildSettingsTile(
+            icon: Icons.book,
+            title: 'Diário',
+            subtitle: 'Observações pessoais e anotações',
+            onTap: () => _showFeatureInDevelopment('Diário', context),
           ),
         ],
       ),
@@ -337,6 +426,13 @@ class ProfileScreen extends StatelessWidget {
       height: 1,
       color: Colors.grey.withOpacity(0.2),
       indent: 60,
+    );
+  }
+
+  void _showFeatureInDevelopment(String featureName, BuildContext context) {
+    ToastService.showInfo(
+      context,
+      '$featureName está em desenvolvimento. Esta funcionalidade estará disponível em uma próxima versão do aplicativo.',
     );
   }
 }

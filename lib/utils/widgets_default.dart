@@ -10,11 +10,22 @@ class WidgetsDefault {
     required VoidCallback onTap,
     required bool isRequired,
     String? Function(DateTime?)? validator,
+    bool isEnabled = true,
   }) {
+    final Color contentColor = isEnabled ? primaryColor : Colors.grey.shade500;
+    final Color textColorValue = isEnabled ? textColor : Colors.grey.shade500;
+    final Color labelColor = isEnabled ? textColor : Colors.grey.shade400;
+    final Color backgroundColorValue = isEnabled
+        ? backgroundColor
+        : Colors.grey.shade100;
+
     return FormField<DateTime>(
       initialValue: value,
       validator: validator,
       builder: (FormFieldState<DateTime> state) {
+        final Color borderColor = state.hasError
+            ? secondaryColor
+            : (isEnabled ? textColor.withOpacity(0.3) : Colors.grey.shade300);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -23,32 +34,30 @@ class WidgetsDefault {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: textColor,
+                color: labelColor,
               ),
             ),
             const SizedBox(height: 8),
             InkWell(
-              onTap: onTap,
+              onTap: isEnabled ? onTap : null,
+              borderRadius: BorderRadius.circular(12),
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 16,
+                ),
                 decoration: BoxDecoration(
-                  color: backgroundColor,
+                  color: backgroundColorValue,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: state.hasError 
-                        ? secondaryColor 
-                        : textColor.withValues(alpha: 0.3),
+                    color: borderColor,
                     width: state.hasError ? 2 : 1,
                   ),
                 ),
                 child: Row(
                   children: [
-                    Icon(
-                      Icons.calendar_today, 
-                      color: primaryColor, 
-                      size: 20,
-                    ),
+                    Icon(Icons.calendar_today, color: contentColor, size: 20),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
@@ -57,18 +66,14 @@ class WidgetsDefault {
                             : 'Selecionar data',
                         style: TextStyle(
                           color: value != null
-                              ? textColor
-                              : textColor.withValues(alpha: 0.5),
+                              ? textColorValue
+                              : textColorValue.withValues(alpha: 0.7),
                           fontSize: 16,
                         ),
                       ),
                     ),
                     if (value != null)
-                      Icon(
-                        Icons.check_circle,
-                        color: primaryColor,
-                        size: 20,
-                      ),
+                      Icon(Icons.check_circle, color: contentColor, size: 20),
                   ],
                 ),
               ),
@@ -78,10 +83,7 @@ class WidgetsDefault {
                 padding: const EdgeInsets.only(top: 8, left: 16),
                 child: Text(
                   state.errorText!,
-                  style: TextStyle(
-                    color: secondaryColor,
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: secondaryColor, fontSize: 12),
                 ),
               ),
           ],
@@ -136,5 +138,4 @@ class WidgetsDefault {
       ],
     );
   }
-
 }

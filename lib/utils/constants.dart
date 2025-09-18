@@ -71,3 +71,30 @@ void updateTheme(bool isDarkMode) {
     surfaceColor = surfaceColorLight;
   }
 }
+
+// --- DECORAÇÃO PADRÃO PARA INPUTS ---
+InputDecoration get defaultInputDecoration => InputDecoration(
+  filled: true,
+  fillColor: backgroundColor,
+  border: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(12.0),
+    borderSide: BorderSide.none,
+  ),
+  enabledBorder: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(12.0),
+    borderSide: BorderSide(color: textColor.withOpacity(0.3)),
+  ),
+  focusedBorder: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(12.0),
+    borderSide: BorderSide(color: primaryColor, width: 2),
+  ),
+  errorBorder: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(12.0),
+    borderSide: BorderSide(color: secondaryColor, width: 2),
+  ),
+  focusedErrorBorder: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(12.0),
+    borderSide: BorderSide(color: secondaryColor, width: 2),
+  ),
+  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+);

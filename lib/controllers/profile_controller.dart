@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:app_remedio/controllers/database_controller.dart';
+import 'package:app_remedio/controllers/global_state_controller.dart';
 import 'package:app_remedio/models/profile_model.dart';
 import 'package:app_remedio/utils/toast_service.dart';
 import 'package:app_remedio/utils/profile_helper.dart';
@@ -63,12 +64,12 @@ class ProfileController extends GetxController {
     try {
       final prefs = await SharedPreferences.getInstance();
       final profileId = prefs.getInt(_currentProfileKey);
-      
+
       if (profileId != null) {
         final profile = profiles.firstWhereOrNull((p) => p.id == profileId);
         currentProfile.value = profile;
       }
-      
+
       // Se não houver perfil atual ou não encontrou, define o primeiro
       if (currentProfile.value == null && profiles.isNotEmpty) {
         await setCurrentProfile(profiles.first);
@@ -83,13 +84,16 @@ class ProfileController extends GetxController {
     try {
       currentProfile.value = profile;
       await _saveCurrentProfileId(profile.id!);
-      
+
       // Notifica outros controllers sobre a mudança de perfil
       ProfileHelper.notifyProfileChanged();
-      
+
       final context = Get.overlayContext;
       if (context != null) {
-        ToastService.showSuccess(context, 'Perfil alterado para ${profile.nome}');
+        ToastService.showSuccess(
+          context,
+          'Perfil alterado para ${profile.nome}',
+        );
       }
     } catch (e) {
       final context = Get.overlayContext;
@@ -114,21 +118,24 @@ class ProfileController extends GetxController {
     try {
       isLoading.value = true;
       final db = await _dbController.database;
-      
+
       final id = await db.insert('tblPerfil', profile.toMap());
       final newProfile = profile.copyWith(id: id);
-      
+
       profiles.add(newProfile);
-      
+
       // Se for o primeiro perfil, define como atual
       if (currentProfile.value == null) {
         currentProfile.value = newProfile;
         await _saveCurrentProfileId(newProfile.id!);
       }
-      
+
       final context = Get.overlayContext;
       if (context != null) {
-        ToastService.showSuccess(context, 'Perfil "${profile.nome}" criado com sucesso!');
+        ToastService.showSuccess(
+          context,
+          'Perfil "${profile.nome}" criado com sucesso!',
+        );
       }
       return true;
     } catch (e) {
@@ -147,30 +154,40 @@ class ProfileController extends GetxController {
     try {
       isLoading.value = true;
       final db = await _dbController.database;
-      
+
       await db.update(
         'tblPerfil',
         profile.toMap(),
         where: 'id = ?',
         whereArgs: [profile.id],
       );
-      
+
       final index = profiles.indexWhere((p) => p.id == profile.id);
       if (index != -1) {
+        // SOLUÇÃO MAIS FORTE: Atualizar ANTES de qualquer outra coisa
         profiles[index] = profile;
-        
+
         // Atualiza o perfil atual se for o mesmo
         if (currentProfile.value?.id == profile.id) {
-          // Força limpeza do cache de imagem
+          // Limpa cache de imagens para garantir atualização
           _clearImageCache();
-          
-          // Recarrega o perfil completamente do banco
-          await _reloadCurrentProfile(profile.id!);
+
+          // Atualiza diretamente o perfil atual
+          currentProfile.value = profile;
+
+          // Notifica o GlobalStateController sobre a mudança
+          try {
+            final globalState = Get.find<GlobalStateController>();
+            globalState.notifyProfileUpdate();
+          } catch (e) {
+            print('GlobalStateController não encontrado: $e');
+          }
         }
         
-        profiles.refresh(); // Força atualização da lista após tudo
+        // Atualiza a lista reativa
+        profiles.refresh();
       }
-      
+
       final context = Get.overlayContext;
       if (context != null) {
         ToastService.showSuccess(context, 'Perfil atualizado com sucesso!');
@@ -194,7 +211,10 @@ class ProfileController extends GetxController {
       if (profiles.length <= 1) {
         final context = Get.overlayContext;
         if (context != null) {
-          ToastService.showError(context, 'Não é possível excluir o único perfil!');
+          ToastService.showError(
+            context,
+            'Não é possível excluir o único perfil!',
+          );
         }
         return false;
       }
@@ -205,7 +225,7 @@ class ProfileController extends GetxController {
 
       isLoading.value = true;
       final db = await _dbController.database;
-      
+
       // Soft delete
       await db.update(
         'tblPerfil',
@@ -213,10 +233,10 @@ class ProfileController extends GetxController {
         where: 'id = ?',
         whereArgs: [profile.id],
       );
-      
+
       // Remove da lista
       profiles.removeWhere((p) => p.id == profile.id);
-      
+
       // Se era o perfil atual, muda para outro
       if (currentProfile.value?.id == profile.id) {
         if (profiles.isNotEmpty) {
@@ -228,10 +248,13 @@ class ProfileController extends GetxController {
           await prefs.remove(_currentProfileKey);
         }
       }
-      
+
       final context = Get.overlayContext;
       if (context != null) {
-        ToastService.showSuccess(context, 'Perfil "${profile.nome}" excluído com sucesso!');
+        ToastService.showSuccess(
+          context,
+          'Perfil "${profile.nome}" excluído com sucesso!',
+        );
       }
       return true;
     } catch (e) {
@@ -256,7 +279,7 @@ class ProfileController extends GetxController {
         maxWidth: 1024,
         maxHeight: 1024,
       );
-      
+
       if (image != null) {
         return await _saveImageToAppDir(image.path);
       }
@@ -278,7 +301,7 @@ class ProfileController extends GetxController {
         maxWidth: 1024,
         maxHeight: 1024,
       );
-      
+
       if (image != null) {
         return await _saveImageToAppDir(image.path);
       }
@@ -296,31 +319,31 @@ class ProfileController extends GetxController {
     try {
       final directory = await getApplicationDocumentsDirectory();
       final profileImagesDir = Directory('${directory.path}/profile_images');
-      
+
       // Cria o diretório se não existir
       if (!await profileImagesDir.exists()) {
         await profileImagesDir.create(recursive: true);
       }
-      
+
       // Verifica se o arquivo original existe
       final originalFile = File(imagePath);
       if (!await originalFile.exists()) {
         throw Exception('Arquivo original não encontrado: $imagePath');
       }
-      
+
       // Gera um nome único para a imagem
       final fileName = 'profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final newPath = '${profileImagesDir.path}/$fileName';
-      
+
       // Copia a imagem para o diretório do app
       await originalFile.copy(newPath);
-      
+
       // Verifica se o arquivo foi copiado com sucesso
       final newFile = File(newPath);
       if (!await newFile.exists()) {
         throw Exception('Falha ao copiar arquivo para: $newPath');
       }
-      
+
       return newPath;
     } catch (e) {
       print('Erro ao salvar imagem: $e');
@@ -387,6 +410,8 @@ class ProfileController extends GetxController {
       // Limpa cache de imagens para forçar recarregamento
       PaintingBinding.instance.imageCache.clear();
       PaintingBinding.instance.imageCache.clearLiveImages();
+      // Força rebuild de widgets dependentes
+      update();
     } catch (e) {
       print('Erro ao limpar cache de imagem: $e');
     }
@@ -406,6 +431,11 @@ class ProfileController extends GetxController {
         final reloadedProfile = Profile.fromMap(result.first);
         currentProfile.value = reloadedProfile;
         await _saveCurrentProfileId(profileId);
+
+        // Força rebuilds para garantir que todos os widgets atualizem
+        currentProfile.refresh();
+        profiles.refresh();
+        update();
       }
     } catch (e) {
       print('Erro ao recarregar perfil atual: $e');
@@ -448,7 +478,9 @@ class ProfileController extends GetxController {
         final isDeviceSupported = await _localAuth.isDeviceSupported();
         final availableBiometrics = await _localAuth.getAvailableBiometrics();
 
-        if (isAvailable && isDeviceSupported && availableBiometrics.isNotEmpty) {
+        if (isAvailable &&
+            isDeviceSupported &&
+            availableBiometrics.isNotEmpty) {
           // Tentar autenticação biométrica
           final biometricResult = await _authenticateWithBiometrics();
           if (biometricResult) {
@@ -479,7 +511,7 @@ class ProfileController extends GetxController {
   Future<bool> _authenticateWithBiometrics() async {
     try {
       await HapticFeedback.mediumImpact();
-      
+
       final didAuthenticate = await _localAuth.authenticate(
         localizedReason: 'Confirme sua identidade para excluir o perfil',
         options: const AuthenticationOptions(
@@ -498,7 +530,7 @@ class ProfileController extends GetxController {
       }
     } catch (e) {
       print('Erro na autenticação biométrica: $e');
-      
+
       // Não mostra toast aqui, deixa para o diálogo de falha lidar com isso
       await HapticFeedback.heavyImpact();
       return false;
@@ -550,10 +582,10 @@ class ProfileController extends GetxController {
   Future<bool> _authenticateWithManualConfirmation() async {
     try {
       await HapticFeedback.mediumImpact();
-      
+
       final TextEditingController confirmController = TextEditingController();
       final RxBool isValid = false.obs;
-      
+
       final authDialog = await Get.dialog<bool>(
         AlertDialog(
           title: const Text('Confirme sua Identidade'),
@@ -565,21 +597,23 @@ class ProfileController extends GetxController {
                 'Para excluir o perfil, digite "EXCLUIR" no campo abaixo para confirmar.',
               ),
               const SizedBox(height: 16),
-              Obx(() => TextField(
-                controller: confirmController,
-                decoration: InputDecoration(
-                  hintText: 'Digite EXCLUIR',
-                  border: const OutlineInputBorder(),
-                  prefixIcon: const Icon(Icons.security),
-                  suffixIcon: isValid.value 
-                    ? const Icon(Icons.check_circle, color: Colors.green)
-                    : null,
+              Obx(
+                () => TextField(
+                  controller: confirmController,
+                  decoration: InputDecoration(
+                    hintText: 'Digite EXCLUIR',
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.security),
+                    suffixIcon: isValid.value
+                        ? const Icon(Icons.check_circle, color: Colors.green)
+                        : null,
+                  ),
+                  onChanged: (value) {
+                    isValid.value = value.toUpperCase() == 'EXCLUIR';
+                  },
+                  textCapitalization: TextCapitalization.characters,
                 ),
-                onChanged: (value) {
-                  isValid.value = value.toUpperCase() == 'EXCLUIR';
-                },
-                textCapitalization: TextCapitalization.characters,
-              )),
+              ),
             ],
           ),
           actions: [
@@ -587,15 +621,15 @@ class ProfileController extends GetxController {
               onPressed: () => Get.back(result: false),
               child: const Text('Cancelar'),
             ),
-            Obx(() => TextButton(
-              onPressed: isValid.value 
-                ? () => Get.back(result: true)
-                : null,
-              style: TextButton.styleFrom(
-                foregroundColor: isValid.value ? Colors.red : Colors.grey,
+            Obx(
+              () => TextButton(
+                onPressed: isValid.value ? () => Get.back(result: true) : null,
+                style: TextButton.styleFrom(
+                  foregroundColor: isValid.value ? Colors.red : Colors.grey,
+                ),
+                child: const Text('Confirmar'),
               ),
-              child: const Text('Confirmar'),
-            )),
+            ),
           ],
         ),
         barrierDismissible: false,
@@ -627,7 +661,7 @@ class ProfileController extends GetxController {
     if (nome.trim().isEmpty) {
       return 'Nome é obrigatório';
     }
-    
+
     if (nome.trim().length < 2) {
       return 'Nome deve ter pelo menos 2 caracteres';
     }
@@ -652,6 +686,7 @@ class ProfileController extends GetxController {
   }
 
   /// Recarrega os dados
+  @override
   Future<void> refresh() async {
     await _loadProfiles();
     await _loadCurrentProfile();

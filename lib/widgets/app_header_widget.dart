@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:app_remedio/utils/constants.dart';
 import 'package:app_remedio/controllers/theme_controller.dart';
+import 'package:app_remedio/controllers/profile_controller.dart';
 import 'package:app_remedio/widgets/profile_selector_widget.dart';
 import 'package:app_remedio/utils/toast_service.dart';
 
@@ -10,19 +11,22 @@ class AppHeaderWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final themeController = Get.find<ThemeController>();
-
     return Obx(() {
-      // Força rebuild quando o tema muda
+      // Força rebuild quando perfil ou tema mudam
+      final profileController = Get.find<ProfileController>();
+      final themeController = Get.find<ThemeController>();
+      
+      // Observa mudanças no perfil e tema
+      profileController.currentProfile.value;
+      profileController.profiles.length;
       themeController.isDarkMode;
 
       return Container(
         color: surfaceColor,
-        // CORREÇÃO: Adiciona padding superior para evitar sobreposição com a barra de status
         padding: EdgeInsets.only(
           left: 20,
           right: 20,
-          top: MediaQuery.of(context).padding.top + 16, // SafeArea + padding
+          top: MediaQuery.of(context).padding.top + 16,
           bottom: 16,
         ),
         child: Row(
@@ -60,7 +64,6 @@ class AppHeaderWidget extends StatelessWidget {
                 color: textColor.withValues(alpha: 0.6),
               ),
               onPressed: () {
-                // TODO: Implementar notificações
                 final context = Get.overlayContext;
                 if (context != null) {
                   ToastService.showInfo(
@@ -70,9 +73,11 @@ class AppHeaderWidget extends StatelessWidget {
                 }
               },
             ),
-
-            // Seletor de Perfil
-            const ProfileSelectorWidget(showName: false),
+            // Seletor de Perfil - sem const para permitir atualizações
+            ProfileSelectorWidget(
+              key: ValueKey('profile_selector_${profileController.currentProfile.value?.id}'),
+              showName: false,
+            ),
           ],
         ),
       );

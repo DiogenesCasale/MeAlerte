@@ -155,6 +155,7 @@ enum MedicationStatus {
 // Classe auxiliar para exibir medicamentos hoje
 class TodayDose {
   final int scheduledMedicationId;
+  final int idMedicamento; // ID do medicamento para redução de estoque
   final String medicationName;
   final double dose; // Quantidade numérica da dose
   final DateTime scheduledTime;
@@ -166,6 +167,7 @@ class TodayDose {
 
   TodayDose({
     required this.scheduledMedicationId,
+    required this.idMedicamento,
     required this.medicationName,
     required this.dose,
     required this.scheduledTime,
@@ -178,6 +180,7 @@ class TodayDose {
 
   TodayDose copyWith({
     int? scheduledMedicationId,
+    int? idMedicamento,
     String? medicationName,
     double? dose,
     DateTime? scheduledTime,
@@ -189,6 +192,7 @@ class TodayDose {
   }) {
     return TodayDose(
       scheduledMedicationId: scheduledMedicationId ?? this.scheduledMedicationId,
+      idMedicamento: idMedicamento ?? this.idMedicamento,
       medicationName: medicationName ?? this.medicationName,
       dose: dose ?? this.dose,
       scheduledTime: scheduledTime ?? this.scheduledTime,
