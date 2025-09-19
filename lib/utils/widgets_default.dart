@@ -15,9 +15,7 @@ class WidgetsDefault {
     final Color contentColor = isEnabled ? primaryColor : Colors.grey.shade500;
     final Color textColorValue = isEnabled ? textColor : Colors.grey.shade500;
     final Color labelColor = isEnabled ? textColor : Colors.grey.shade400;
-    final Color backgroundColorValue = isEnabled
-        ? backgroundColor
-        : Colors.grey.shade100;
+    final Color backgroundColorValue = backgroundColor;
 
     return FormField<DateTime>(
       initialValue: value,

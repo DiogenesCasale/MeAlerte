@@ -205,7 +205,7 @@ class HealthDataListScreen extends GetView<HealthDataController> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: surfaceColor,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(

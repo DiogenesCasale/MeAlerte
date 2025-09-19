@@ -218,7 +218,8 @@ class DatabaseController {
       deletado INTEGER DEFAULT 0,
       dataCriacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       dataAtualizacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (idAgendamento) REFERENCES tblMedicamentosAgendados (id) ON DELETE CASCADE
+      FOREIGN KEY (idAgendamento) REFERENCES tblMedicamentosAgendados (id) ON DELETE CASCADE,
+      FOREIGN KEY (idPerfil) REFERENCES tblPerfil (id) ON DELETE CASCADE
     )
   ''');
 

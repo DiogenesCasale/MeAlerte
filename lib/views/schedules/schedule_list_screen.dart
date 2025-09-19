@@ -153,10 +153,17 @@ class ScheduleListScreen extends GetView<SchedulesController> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       isScrollControlled: true,
-      builder: (ctx) => SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
-          child: Column(
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) {
+          return SingleChildScrollView(
+            controller: scrollController,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+              child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -177,7 +184,8 @@ class ScheduleListScreen extends GetView<SchedulesController> {
               if (dose.caminhoImagem != null && dose.caminhoImagem!.isNotEmpty)
                 Center(
                   child: GestureDetector(
-                    onTap: () => _showFullScreenImage(context, dose.caminhoImagem!),
+                    onTap: () =>
+                        _showFullScreenImage(context, dose.caminhoImagem!),
                     child: Hero(
                       tag: 'medicationImage_${dose.scheduledMedicationId}',
                       child: Container(
@@ -231,17 +239,23 @@ class ScheduleListScreen extends GetView<SchedulesController> {
                       decoration: BoxDecoration(
                         color: primaryColor.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: primaryColor.withOpacity(0.3)),
+                        border: Border.all(
+                          color: primaryColor.withOpacity(0.3),
+                        ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.medication, color: primaryColor, size: 20),
+                              Icon(
+                                Icons.medication,
+                                color: primaryColor,
+                                size: 20,
+                              ),
                               const SizedBox(width: 8),
                               Text(
-                                'Estoque',
+                                'Dose',
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: textColor.withOpacity(0.7),
@@ -269,14 +283,20 @@ class ScheduleListScreen extends GetView<SchedulesController> {
                       decoration: BoxDecoration(
                         color: primaryColor.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: primaryColor.withOpacity(0.3)),
+                        border: Border.all(
+                          color: primaryColor.withOpacity(0.3),
+                        ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.access_time, color: primaryColor, size: 20),
+                              Icon(
+                                Icons.access_time,
+                                color: primaryColor,
+                                size: 20,
+                              ),
                               const SizedBox(width: 8),
                               Text(
                                 'Horário',
@@ -307,43 +327,56 @@ class ScheduleListScreen extends GetView<SchedulesController> {
 
               // Aviso sobre estoque - no lugar onde era a imagem
               FutureBuilder<Medication?>(
-                future: Get.find<MedicationController>().getMedicationById(dose.idMedicamento),
+                future: Get.find<MedicationController>().getMedicationById(
+                  dose.idMedicamento,
+                ),
                 builder: (context, snapshot) {
                   if (snapshot.hasData && snapshot.data != null) {
                     final medication = snapshot.data!;
                     return FutureBuilder<bool>(
-                      future: Get.find<MedicationController>().isLowStock(dose.idMedicamento),
+                      future: Get.find<MedicationController>().isLowStock(
+                        dose.idMedicamento,
+                      ),
                       builder: (context, lowStockSnapshot) {
                         final isLowStock = lowStockSnapshot.data ?? false;
                         return FutureBuilder<double>(
-                          future: Get.find<MedicationController>().getDaysRemaining(dose.idMedicamento),
+                          future: Get.find<MedicationController>()
+                              .getDaysRemaining(dose.idMedicamento),
                           builder: (context, daysSnapshot) {
                             final daysRemaining = daysSnapshot.data ?? 0;
-                            
+
                             Color stockColor = Colors.green;
                             IconData stockIcon = Icons.inventory;
-                            String stockMessage = 'Estoque: ${medication.estoque} unidades';
-                            
+                            String stockMessage =
+                                'Estoque: ${medication.estoque} unidades';
+
                             if (isLowStock) {
-                              stockColor = medication.estoque <= 0 ? Colors.red : Colors.orange;
-                              stockIcon = medication.estoque <= 0 ? Icons.warning : Icons.warning_amber;
-                              
+                              stockColor = medication.estoque <= 0
+                                  ? Colors.red
+                                  : Colors.orange;
+                              stockIcon = medication.estoque <= 0
+                                  ? Icons.warning
+                                  : Icons.warning_amber;
+
                               if (medication.estoque <= 0) {
                                 stockMessage = 'ATENÇÃO: Medicamento em falta!';
                               } else {
-                                final daysText = daysRemaining < 1 
-                                  ? "menos de 1 dia" 
-                                  : "${daysRemaining.toStringAsFixed(1)} dias";
-                                stockMessage = 'ATENÇÃO: Estoque baixo!\n${medication.estoque} unidades (~$daysText restantes)';
+                                final daysText = daysRemaining < 1
+                                    ? "menos de 1 dia"
+                                    : "${daysRemaining.toStringAsFixed(1)} dias";
+                                stockMessage =
+                                    'ATENÇÃO: Estoque baixo!\n${medication.estoque} unidades (~$daysText restantes)';
                               }
                             }
-                            
+
                             return Container(
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
                                 color: stockColor.withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: stockColor.withOpacity(0.3)),
+                                border: Border.all(
+                                  color: stockColor.withOpacity(0.3),
+                                ),
                               ),
                               child: Row(
                                 children: [
@@ -453,27 +486,20 @@ class ScheduleListScreen extends GetView<SchedulesController> {
                   dose.status == MedicationStatus.taken
                       ? Icons.remove_circle_outline
                       : Icons.check,
-                  color: dose.status == MedicationStatus.taken
-                      ? Colors.orange
-                      : Colors.green,
+                  color: backgroundColor,
                 ),
                 label: Text(
                   dose.status == MedicationStatus.taken
                       ? 'Desmarcar como Tomado'
                       : 'Marcar como Tomado',
-                  style: TextStyle(
-                    color: dose.status == MedicationStatus.taken
-                        ? Colors.orange
-                        : Colors.green,
-                  ),
+                  style: TextStyle(color: backgroundColor),
                 ),
                 style: OutlinedButton.styleFrom(
+                  backgroundColor: dose.status == MedicationStatus.taken
+                      ? Colors.orange
+                      : Colors.green,
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  side: BorderSide(
-                    color: dose.status == MedicationStatus.taken
-                        ? Colors.orange
-                        : Colors.green,
-                  ),
+                  side: BorderSide(color: backgroundColor),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -482,14 +508,15 @@ class ScheduleListScreen extends GetView<SchedulesController> {
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
-                icon: Icon(Icons.edit, color: primaryColor),
+                icon: Icon(Icons.edit, color: backgroundColor),
                 label: Text(
                   'Editar Agendamento',
-                  style: TextStyle(color: primaryColor),
+                  style: TextStyle(color: backgroundColor),
                 ),
                 style: OutlinedButton.styleFrom(
+                  backgroundColor: Colors.blue,
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  side: BorderSide(color: primaryColor),
+                  side: BorderSide(color: backgroundColor),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -498,23 +525,27 @@ class ScheduleListScreen extends GetView<SchedulesController> {
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
-                icon: const Icon(Icons.delete, color: Colors.red),
-                label: const Text(
+                icon: Icon(Icons.delete, color: backgroundColor),
+                label: Text(
                   'Deletar Agendamento',
-                  style: TextStyle(color: Colors.red),
+                  style: TextStyle(color: backgroundColor),
                 ),
                 style: OutlinedButton.styleFrom(
+                  backgroundColor: Colors.red,
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  side: const BorderSide(color: Colors.red),
+                  side: BorderSide(color: backgroundColor),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
                 onPressed: () => _deleteMedication(dose),
               ),
+              const SizedBox(height: 8),
             ],
           ),
         ),
+      );
+        },
       ),
     );
   }
@@ -726,6 +757,7 @@ class ScheduleListScreen extends GetView<SchedulesController> {
   }
 
   void _editMedication(TodayDose dose) {
+    Get.back(); // Fechar o modal primeiro
     Get.to(() => EditScheduleScreen(dose: dose));
   }
 
@@ -811,13 +843,14 @@ class ScheduleListScreen extends GetView<SchedulesController> {
               style: TextStyle(color: textColor.withOpacity(0.6)),
             ),
           ),
-          TextButton(
-            onPressed: () => _confirmDeleteSingle(dose),
-            child: Text(
-              'Apenas este horário',
-              style: TextStyle(color: Colors.orange),
-            ),
-          ),
+          // TODO: Implementar a exclusão de um horário específico
+          // TextButton(
+          //   onPressed: () => _confirmDeleteSingle(dose),
+          //   child: Text(
+          //     'Apenas este horário',
+          //     style: TextStyle(color: Colors.orange),
+          //   ),
+          // ),
           TextButton(
             onPressed: () => _confirmDeleteAll(dose),
             child: Text(
@@ -857,7 +890,9 @@ class ScheduleListScreen extends GetView<SchedulesController> {
                   dose.scheduledMedicationId,
                   dose.scheduledTime,
                 );
-                _showDeleteSuccessToast('Horário específico de ${dose.medicationName} foi excluído');
+                _showDeleteSuccessToast(
+                  'Horário específico de ${dose.medicationName} foi excluído',
+                );
                 Get.back(); // Fechar modal principal
               } catch (e) {
                 print('Erro ao excluir horário específico: $e');

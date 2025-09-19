@@ -21,12 +21,14 @@ class ProfileScreen extends StatelessWidget {
       backgroundColor: scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        elevation: 0, 
+        elevation: 0,
         automaticallyImplyLeading: showBackButton,
-        leading: showBackButton ? IconButton(
-          icon: Icon(Icons.arrow_back, color: textColor),
-          onPressed: () => Get.back(),
-        ) : null,
+        leading: showBackButton
+            ? IconButton(
+                icon: Icon(Icons.arrow_back, color: textColor),
+                onPressed: () => Get.back(),
+              )
+            : null,
         title: Text(
           'Perfil',
           style: TextStyle(
@@ -41,9 +43,9 @@ class ProfileScreen extends StatelessWidget {
         // Força rebuild quando o perfil muda
         profileController.currentProfile.value;
         profileController.profiles.length;
-        
+
         final currentProfile = profileController.currentProfile.value;
-        
+
         if (profileController.isLoading.value) {
           return const Center(child: CircularProgressIndicator());
         }
@@ -110,7 +112,10 @@ class ProfileScreen extends StatelessWidget {
                     icon: const Icon(Icons.add),
                     label: const Text(
                       'Criar Primeiro Perfil',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryColor,
@@ -136,45 +141,42 @@ class ProfileScreen extends StatelessWidget {
       child: SingleChildScrollView(
         child: Column(
           children: [
-            // Cabeçalho do Perfil Atual - com Obx para reatividade
-            Obx(() => _buildCurrentProfileHeader()),
-          
-          const SizedBox(height: 24),
-          
-          // Seção Perfil
-          _buildSectionHeader('Meu Perfil'),
-          const SizedBox(height: 12),
-          Obx(() => _buildProfileSection()),
-          
-          const SizedBox(height: 24),
-          
-          // Seção Saúde
-          _buildSectionHeader('Saúde e Acompanhamento'),
-          const SizedBox(height: 12),
-          Builder(
-            builder: (context) => _buildHealthSection(context),
-          ),
-          
-          const SizedBox(height: 24),
-          
-          // Seção Configurações
-          _buildSectionHeader('Configurações'),
-          const SizedBox(height: 12),
-          _buildSettingsSection(),
-        ],
+            _buildCurrentProfileHeader(),
+
+            const SizedBox(height: 24),
+
+            // Seção Perfil
+            _buildSectionHeader('Meu Perfil'),
+            const SizedBox(height: 12),
+            _buildProfileSection(),
+
+            const SizedBox(height: 24),
+
+            // Seção Saúde
+            _buildSectionHeader('Saúde e Acompanhamento'),
+            const SizedBox(height: 12),
+            Builder(builder: (context) => _buildHealthSection(context)),
+
+            const SizedBox(height: 24),
+
+            // Seção Configurações
+            _buildSectionHeader('Configurações'),
+            const SizedBox(height: 12),
+            _buildSettingsSection(),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildCurrentProfileHeader() {
     final profileController = Get.find<ProfileController>();
     final currentProfile = profileController.currentProfile.value;
-    
+
     if (currentProfile == null) {
       return const SizedBox.shrink();
     }
-    
+
     return Container(
       decoration: BoxDecoration(
         color: primaryColor.withOpacity(0.1),
@@ -185,7 +187,9 @@ class ProfileScreen extends StatelessWidget {
       child: Row(
         children: [
           ProfileImageWidget(
-            key: ValueKey('profile_image_${currentProfile.id}_${currentProfile.caminhoImagem}'),
+            key: ValueKey(
+              'profile_image_${currentProfile.id}_${currentProfile.caminhoImagem}',
+            ),
             imagePath: currentProfile.caminhoImagem,
             size: 60,
           ),
@@ -224,11 +228,7 @@ class ProfileScreen extends StatelessWidget {
               ],
             ),
           ),
-          Icon(
-            Icons.check_circle,
-            color: primaryColor,
-            size: 24,
-          ),
+          Icon(Icons.check_circle, color: primaryColor, size: 24),
         ],
       ),
     );
@@ -251,7 +251,7 @@ class ProfileScreen extends StatelessWidget {
   Widget _buildProfileSection() {
     final profileController = Get.find<ProfileController>();
     final currentProfile = profileController.currentProfile.value;
-    
+
     return Container(
       decoration: BoxDecoration(
         color: surfaceColor,
@@ -270,14 +270,12 @@ class ProfileScreen extends StatelessWidget {
             icon: Icons.edit,
             title: 'Editar Perfil',
             subtitle: 'Alterar informações pessoais e foto',
-            onTap: currentProfile != null ? () async {
-              final result = await Get.to(() => EditProfileScreen(profile: currentProfile));
-              if (result == true) {
-                // Força atualização quando voltar da edição
-                profileController.currentProfile.refresh();
-                profileController.profiles.refresh();
-              }
-            } : null,
+            onTap: currentProfile != null
+                ? () {
+                    // Apenas navegue. O controller agora gerencia 100% da atualização.
+                    Get.to(() => EditProfileScreen(profile: currentProfile));
+                  }
+                : null,
           ),
           _buildDivider(),
           _buildSettingsTile(
@@ -387,11 +385,7 @@ class ProfileScreen extends StatelessWidget {
           color: primaryColor.withOpacity(0.1),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Icon(
-          icon,
-          color: primaryColor,
-          size: 20,
-        ),
+        child: Icon(icon, color: primaryColor, size: 20),
       ),
       title: Text(
         title,
@@ -404,29 +398,20 @@ class ProfileScreen extends StatelessWidget {
       subtitle: subtitle != null
           ? Text(
               subtitle,
-              style: TextStyle(
-                fontSize: 14,
-                color: textColor.withOpacity(0.6),
-              ),
+              style: TextStyle(fontSize: 14, color: textColor.withOpacity(0.6)),
             )
           : null,
-      trailing: trailing ??
+      trailing:
+          trailing ??
           (onTap != null
-              ? Icon(
-                  Icons.chevron_right,
-                  color: Colors.grey,
-                )
+              ? Icon(Icons.chevron_right, color: Colors.grey)
               : null),
       onTap: onTap,
     );
   }
 
   Widget _buildDivider() {
-    return Divider(
-      height: 1,
-      color: Colors.grey.withOpacity(0.2),
-      indent: 60,
-    );
+    return Divider(height: 1, color: Colors.grey.withOpacity(0.2), indent: 60);
   }
 
   void _showFeatureInDevelopment(String featureName, BuildContext context) {

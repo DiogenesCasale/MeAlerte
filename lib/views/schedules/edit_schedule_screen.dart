@@ -40,10 +40,9 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
 
   Future<void> _loadScheduledMedication() async {
     try {
-      _scheduledMedication = await schedulesController.getScheduledMedicationById(
-        widget.dose.scheduledMedicationId,
-      );
-      
+      _scheduledMedication = await schedulesController
+          .getScheduledMedicationById(widget.dose.scheduledMedicationId);
+
       if (_scheduledMedication == null) {
         throw Exception('Medicamento agendado não encontrado');
       }
@@ -65,12 +64,14 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
       } else {
         _dataInicio = DateTime.now(); // Se não tem data início, usar hoje
       }
-      
+
       if (_scheduledMedication!.dataFim != null) {
         try {
           _dataFim = DateTime.parse(_scheduledMedication!.dataFim!);
         } catch (e) {
-          _dataFim = DateTime.now().add(const Duration(days: 30)); // Fallback para 30 dias
+          _dataFim = DateTime.now().add(
+            const Duration(days: 30),
+          ); // Fallback para 30 dias
         }
       }
 
@@ -151,13 +152,14 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
               style: TextStyle(color: textColor.withOpacity(0.6)),
             ),
           ),
-          TextButton(
-            onPressed: () => _confirmEditSingle(),
-            child: Text(
-              'Apenas este horário',
-              style: TextStyle(color: Colors.orange),
-            ),
-          ),
+          // TODO: Implementar a edição de um horário específico
+          // TextButton(
+          //   onPressed: () => _confirmEditSingle(),
+          //   child: Text(
+          //     'Apenas este horário',
+          //     style: TextStyle(color: Colors.orange),
+          //   ),
+          // ),
           TextButton(
             onPressed: () => _confirmEditAll(),
             child: Text(
@@ -207,11 +209,19 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
                 );
 
                 Get.back(); // Fechar dialog
-                ToastService.showSuccess(context, 'Dose específica atualizada com sucesso!');
-                Get.offAll(() => MainLayout(initialIndex: 0)); // Voltar para tela principal
+                ToastService.showSuccess(
+                  context,
+                  'Dose específica atualizada com sucesso!',
+                );
+                Get.offAll(
+                  () => MainLayout(initialIndex: 0),
+                ); // Voltar para tela principal
               } catch (e) {
                 debugPrint('Erro ao atualizar dose específica: $e');
-                ToastService.showError(context, 'Erro ao atualizar dose específica');
+                ToastService.showError(
+                  context,
+                  'Erro ao atualizar dose específica',
+                );
               }
             },
             child: Text(
@@ -485,19 +495,19 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
                 isEnabled: false, // Desabilita visualmente
               ),
               const SizedBox(height: 16),
+              WidgetsDefault.buildDateField(
+                label: 'Data Fim',
+                value: _dataFim,
+                onTap: () => _selectEndDate(),
+                isRequired: !_paraSempre,
+                isEnabled: !_paraSempre,
+              ),
+              const SizedBox(height: 4),
+
+              // ALTERAÇÃO 3: O InkWell com o Checkbox foi movido para baixo e alinhado à direita.
               Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.end, // Alinha à direita
                 children: [
-                  Expanded(
-                    child: WidgetsDefault.buildDateField(
-                      label: 'Data Fim',
-                      value: _dataFim,
-                      onTap: () => _selectEndDate(),
-                      isRequired: !_paraSempre,
-                      isEnabled: !_paraSempre,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
                   InkWell(
                     borderRadius: BorderRadius.circular(8),
                     onTap: () {
@@ -509,9 +519,10 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 4.0,
-                        vertical: 8.0,
+                        vertical: 6.0,
                       ),
                       child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Checkbox(
                             value: _paraSempre,
@@ -546,7 +557,19 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
     final TimeOfDay? picked = await showTimePicker(
       context: context,
       initialTime: _selectedTime,
-      // ... (seu tema do time picker pode ser colado aqui)
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: primaryColor,
+              onPrimary: Colors.white,
+              surface: surfaceColor,
+              onSurface: textColor,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (picked != null && picked != _selectedTime) {
       setState(() => _selectedTime = picked);
@@ -562,7 +585,19 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
           DateTime.now().add(const Duration(days: 7)),
       firstDate: _dataInicio ?? DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
-      // ... (seu tema do date picker pode ser colado aqui)
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: primaryColor,
+              onPrimary: Colors.white,
+              surface: surfaceColor,
+              onSurface: textColor,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (picked != null) {
       setState(() {

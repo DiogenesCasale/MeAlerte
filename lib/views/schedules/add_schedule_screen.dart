@@ -48,14 +48,14 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
   void initState() {
     super.initState();
 
-     _scrollController.addListener(() {
+    _scrollController.addListener(() {
       // Se o dropdown estiver visível e o usuário rolar a tela
       if (_overlayEntry != null) {
         _medicationFocusNode.unfocus(); // Tira o foco do campo de texto
         _hideDropdown(); // Esconde o dropdown
       }
     });
-    
+
     _medicationFocusNode.addListener(() {
       if (_medicationFocusNode.hasFocus) {
         _showDropdown();
@@ -451,7 +451,6 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
                 //   '${_selectedTime.hour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')}',
                 //   _selectTime,
                 // ),
-
                 _buildDoseAndTimeRow(),
 
                 const SizedBox(height: 20),
@@ -589,82 +588,83 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
   }
 
   Widget _buildDurationSelector() {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text('Duração do Tratamento *', style: heading2Style),
-      const SizedBox(height: 12),
-      Container(
-        padding: const EdgeInsets.all(16.0),
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: textColor.withOpacity(0.3)),
-        ),
-        child: Column(
-          children: [
-            // Data de Início não muda
-            WidgetsDefault.buildDateField(
-              label: 'Data Início',
-              value: _dataInicio,
-              onTap: () => _selectStartDate(),
-              isRequired: true,
-            ),
-            const SizedBox(height: 16),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Duração do Tratamento *', style: heading2Style),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(16.0),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: textColor.withOpacity(0.3)),
+          ),
+          child: Column(
+            children: [
+              // Data de Início (permanece igual)
+              WidgetsDefault.buildDateField(
+                label: 'Data Início',
+                value: _dataInicio,
+                onTap: () => _selectStartDate(),
+                isRequired: true,
+              ),
+              const SizedBox(height: 16),
 
-            // --- SEÇÃO DE DATA FIM MELHORADA ---
-            Row(
-              // ALINHAMENTO VERTICAL CORRIGIDO
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: WidgetsDefault.buildDateField(
-                    label: 'Data Fim',
-                    value: _dataFim,
-                    onTap: () => _selectEndDate(), // onTap agora é simples
-                    isRequired: !_paraSempre,
-                    // A MÁGICA ACONTECE AQUI!
-                    isEnabled: !_paraSempre, 
-                  ),
-                ),
-                const SizedBox(width: 16), // Aumentei o espaçamento
-                
-                // Checkbox com melhor clique e alinhamento
-                InkWell(
-                  borderRadius: BorderRadius.circular(8),
-                  onTap: () {
-                    setState(() {
-                      _paraSempre = !_paraSempre;
-                      if (_paraSempre) _dataFim = null;
-                    });
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 8.0),
-                    child: Row(
-                      children: [
-                        Checkbox(
-                          value: _paraSempre,
-                          onChanged: (value) {
-                            setState(() {
-                              _paraSempre = value ?? false;
-                              if (_paraSempre) _dataFim = null;
-                            });
-                          },
-                          activeColor: primaryColor,
-                        ),
-                        Text('Para Sempre', style: TextStyle(color: textColor)),
-                      ],
+              WidgetsDefault.buildDateField(
+                label: 'Data Fim',
+                value: _dataFim, // Lógica para exibir o texto
+                onTap: () => _selectEndDate(), // Desabilita o clique
+                isRequired: !_paraSempre,
+                isEnabled: !_paraSempre, // A mágica acontece aqui!
+              ),
+              const SizedBox(height: 4),
+
+              // 2. Checkbox abaixo e alinhado à direita
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end, // Alinha na direita
+                children: [
+                  InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () {
+                      setState(() {
+                        _paraSempre = !_paraSempre;
+                        if (_paraSempre) _dataFim = null;
+                      });
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4.0,
+                        vertical: 8.0,
+                      ),
+                      child: Row(
+                        children: [
+                          Checkbox(
+                            value: _paraSempre,
+                            onChanged: (value) {
+                              setState(() {
+                                _paraSempre = value ?? false;
+                                if (_paraSempre) _dataFim = null;
+                              });
+                            },
+                            activeColor: primaryColor,
+                          ),
+                          Text(
+                            'Para Sempre',
+                            style: TextStyle(color: textColor),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
-      ),
-    ],
-  );
-}
+      ],
+    );
+  }
 
   Widget _buildObservationField() {
     return Column(
@@ -807,7 +807,6 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
           ),
         ),
         const SizedBox(width: 16), // Espaçamento entre os campos
-
         // Widget da Hora ocupando a outra metade do espaço
         Expanded(
           child: _buildTimePicker(
@@ -819,6 +818,4 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
       ],
     );
   }
-
-  
 }

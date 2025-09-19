@@ -251,7 +251,7 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Tipo *', style: heading2Style),
+              Text('Tipo do Medicamento *', style: heading2Style),
               const SizedBox(height: 8),
               DropdownButtonFormField<MedicationType>(
                 value: _selectedType,

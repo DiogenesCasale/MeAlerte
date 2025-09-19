@@ -48,6 +48,7 @@ class _EditMedicationScreenState extends State<EditMedicationScreen> {
     _selectedType = widget.medication.tipo;
     _savedImagePath = widget.medication.caminhoImagem;
     _observacaoLength = _observacaoController.text.length;
+    _stockController.text = widget.medication.estoque.toString();
 
     // Carrega a imagem existente, se houver
     if (_savedImagePath != null && _savedImagePath!.isNotEmpty) {
@@ -306,7 +307,7 @@ class _EditMedicationScreenState extends State<EditMedicationScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Tipo *', style: heading2Style),
+              Text('Tipo do Medicamento *', style: heading2Style),
               const SizedBox(height: 8),
               DropdownButtonFormField<MedicationType>(
                 value: _selectedType,

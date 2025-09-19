@@ -19,11 +19,10 @@ class _MainLayoutState extends State<MainLayout> {
 
   late int _initialIndex;
 
-  // Lista de telas sem const para permitir rebuild dinâmico
   List<Widget> get _screens => [
     const ScheduleListScreen(showAppBar: false),
     const MedicationListScreen(showAppBar: false),
-    ProfileScreen(showBackButton: false), // Sem const para permitir atualizações
+    ProfileScreen(showBackButton: false), 
   ];
 
   void _onTabTapped(int index) {
@@ -37,10 +36,6 @@ class _MainLayoutState extends State<MainLayout> {
   void initState() {
     super.initState();
 
-    // SUBSTITUA a chamada direta...
-    // _checkProfile(); // <-- Linha problemática
-
-    // ...POR esta chamada agendada:
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkProfile();
     });
@@ -55,7 +50,6 @@ class _MainLayoutState extends State<MainLayout> {
     // Esta função permanece igual
     final profileController = Get.find<ProfileController>();
     if (profileController.currentProfile.value == null) {
-      // Usar Get.off em vez de Get.to pode ser melhor aqui para não empilhar a tela de login sobre o layout principal
       Get.off(() => const ProfileScreen(showBackButton: false));
     }
   }

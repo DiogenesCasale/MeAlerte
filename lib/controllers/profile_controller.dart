@@ -155,6 +155,7 @@ class ProfileController extends GetxController {
       isLoading.value = true;
       final db = await _dbController.database;
 
+      // 1. Atualiza o perfil no banco de dados
       await db.update(
         'tblPerfil',
         profile.toMap(),
@@ -162,31 +163,10 @@ class ProfileController extends GetxController {
         whereArgs: [profile.id],
       );
 
-      final index = profiles.indexWhere((p) => p.id == profile.id);
-      if (index != -1) {
-        // SOLUÇÃO MAIS FORTE: Atualizar ANTES de qualquer outra coisa
-        profiles[index] = profile;
-
-        // Atualiza o perfil atual se for o mesmo
-        if (currentProfile.value?.id == profile.id) {
-          // Limpa cache de imagens para garantir atualização
-          _clearImageCache();
-
-          // Atualiza diretamente o perfil atual
-          currentProfile.value = profile;
-
-          // Notifica o GlobalStateController sobre a mudança
-          try {
-            final globalState = Get.find<GlobalStateController>();
-            globalState.notifyProfileUpdate();
-          } catch (e) {
-            print('GlobalStateController não encontrado: $e');
-          }
-        }
-        
-        // Atualiza a lista reativa
-        profiles.refresh();
-      }
+      // 2. *** A GRANDE MUDANÇA ***
+      // Recarrega todos os perfis e o perfil atual a partir do banco de dados.
+      // Isso garante que a UI receba os dados mais recentes, sem inconsistências.
+      await refresh();
 
       final context = Get.overlayContext;
       if (context != null) {
@@ -685,7 +665,6 @@ class ProfileController extends GetxController {
     return null;
   }
 
-  /// Recarrega os dados
   @override
   Future<void> refresh() async {
     await _loadProfiles();

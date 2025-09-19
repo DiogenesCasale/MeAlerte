@@ -406,12 +406,52 @@ class MedicationListScreen extends GetView<MedicationController> {
             child: Text('Cancelar', style: TextStyle(color: textColor)),
           ),
           ElevatedButton(
-            onPressed: () {
-              Get.back();
-              ToastService.showInfo(
-                Get.context!,
-                'Exclusão será implementada em breve',
-              );
+            onPressed: () async {
+              Get.back(); // Fechar o dialog primeiro
+              
+              try {
+                final result = await controller.deleteMedication(medication.id!);
+                
+                // Usar Get.overlayContext para evitar erro de overlay
+                final overlayContext = Get.overlayContext;
+                if (overlayContext != null) {
+                  if (result == 0) {
+                    ToastService.showSuccess(
+                      overlayContext,
+                      'Medicamento excluído com sucesso',
+                    );
+                  } else if (result == 1) {
+                    ToastService.showError(
+                      overlayContext,
+                      'Não é possível excluir este medicamento pois existem agendamentos vinculados a ele. Exclua ou finalize os agendamentos primeiro.',
+                    );
+                  } else {
+                    ToastService.showError(
+                      overlayContext,
+                      'Não foi possível excluir o medicamento.',
+                    );
+                  }
+                } else {
+                  // Fallback usando Get.snackbar se não houver overlay context
+                  if (result == 0) {
+                    Get.snackbar('Sucesso', 'Medicamento excluído com sucesso');
+                  } else if (result == 1) {
+                    Get.snackbar('Erro', 'Não é possível excluir este medicamento pois existem agendamentos vinculados a ele.');
+                  } else {
+                    Get.snackbar('Erro', 'Não foi possível excluir o medicamento.');
+                  }
+                }
+              } catch (e) {
+                final overlayContext = Get.overlayContext;
+                if (overlayContext != null) {
+                  ToastService.showError(
+                    overlayContext,
+                    'Erro ao excluir medicamento!',
+                  );
+                } else {
+                  Get.snackbar('Erro', 'Erro ao excluir medicamento!');
+                }
+              }
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Excluir', style: TextStyle(color: Colors.white)),

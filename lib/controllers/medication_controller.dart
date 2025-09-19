@@ -175,7 +175,7 @@ class MedicationController extends GetxController {
     await fetchAllMedications();
   }
 
-  Future<void> deleteMedication(int id) async {
+  Future<int> deleteMedication(int id) async {
     final db = await _dbController.database;
 
     final scheduledMedications = await db.query(
@@ -185,9 +185,7 @@ class MedicationController extends GetxController {
     );
 
     if (scheduledMedications.isNotEmpty) {
-      throw Exception(
-        'Não é possível excluir este medicamento pois existem agendamentos vinculados a ele. Exclua ou finalize os agendamentos primeiro.',
-      );
+      return 1;
     }
 
     await db.update(
@@ -197,6 +195,7 @@ class MedicationController extends GetxController {
       whereArgs: [id],
     );
     await fetchAllMedications();
+    return 0;
   }
 
   Future<Medication?> getMedicationById(int id) async {
