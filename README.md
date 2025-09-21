@@ -1,3 +1,1 @@
-# app_remedio
-
-A new Flutter project.
+# Me Alerte - Gerenciamento de Medicamentos
