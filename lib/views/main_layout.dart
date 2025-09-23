@@ -19,10 +19,10 @@ class _MainLayoutState extends State<MainLayout> {
 
   late int _initialIndex;
 
-  List<Widget> get _screens => [
+  final List<Widget> _screens = [
     const ScheduleListScreen(showAppBar: false),
     const MedicationListScreen(showAppBar: false),
-    ProfileScreen(showBackButton: false), 
+    const ProfileScreen(showBackButton: false),
   ];
 
   void _onTabTapped(int index) {
@@ -56,12 +56,28 @@ class _MainLayoutState extends State<MainLayout> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: _screens),
-      bottomNavigationBar: BottomNavigationWidget(
-        currentIndex: _currentIndex,
-        onTap: _onTabTapped,
-      ),
-    );
+    final profileController = Get.find<ProfileController>();
+    
+    return Obx(() {
+      // Observa mudanças no perfil atual
+      final currentProfile = profileController.currentProfile.value;
+      
+      // Se não há perfil, vai para a tela de perfil
+      if (currentProfile == null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Get.off(() => const ProfileScreen(showBackButton: false));
+        });
+      }
+      
+      return Scaffold(
+        body: IndexedStack(index: _currentIndex, children: _screens),
+        bottomNavigationBar: currentProfile != null 
+          ? BottomNavigationWidget(
+              currentIndex: _currentIndex,
+              onTap: _onTabTapped,
+            )
+          : null,
+      );
+    });
   }
 }

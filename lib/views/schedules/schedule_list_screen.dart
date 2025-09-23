@@ -964,8 +964,8 @@ class ScheduleListScreen extends GetView<SchedulesController> {
     final context = Get.overlayContext;
     if (context != null) {
       ToastService.showSuccess(
-        context,
-        '$medicationName foi marcado como tomado',
+        context, 
+        '$medicationName',
       );
     }
   }

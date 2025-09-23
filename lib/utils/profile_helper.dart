@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 import 'package:app_remedio/controllers/profile_controller.dart';
 import 'package:app_remedio/controllers/medication_controller.dart';
 import 'package:app_remedio/controllers/schedules_controller.dart';
+import 'package:app_remedio/controllers/global_state_controller.dart';
 import 'package:app_remedio/models/profile_model.dart';
 
 /// Helper class para gerenciar automaticamente o ID do perfil ativo
@@ -36,6 +37,7 @@ class ProfileHelper {
     // quando o perfil muda, forçando a recarga dos dados
     _notifyMedicationController();
     _notifySchedulesController();
+    _notifyGlobalStateController();
   }
 
   /// Notifica o MedicationController sobre a mudança de perfil
@@ -53,6 +55,16 @@ class ProfileHelper {
     try {
       final schedulesController = Get.find<SchedulesController>();
       schedulesController.reloadSchedules();
+    } catch (e) {
+      // Controller não inicializado ainda
+    }
+  }
+
+  /// Notifica o GlobalStateController sobre a mudança de perfil
+  static void _notifyGlobalStateController() {
+    try {
+      final globalController = Get.find<GlobalStateController>();
+      globalController.notifyProfileUpdate();
     } catch (e) {
       // Controller não inicializado ainda
     }

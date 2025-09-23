@@ -11,6 +11,7 @@ import 'package:app_remedio/controllers/global_state_controller.dart';
 import 'package:app_remedio/models/profile_model.dart';
 import 'package:app_remedio/utils/toast_service.dart';
 import 'package:app_remedio/utils/profile_helper.dart';
+import 'package:app_remedio/views/main_layout.dart';
 
 class ProfileController extends GetxController {
   final _dbController = DatabaseController.instance;
@@ -87,6 +88,14 @@ class ProfileController extends GetxController {
 
       // Notifica outros controllers sobre a mudança de perfil
       ProfileHelper.notifyProfileChanged();
+      
+      // Força atualização global
+      try {
+        final globalController = Get.find<GlobalStateController>();
+        globalController.notifyProfileUpdate();
+      } catch (e) {
+        // GlobalStateController não está disponível
+      }
 
       final context = Get.overlayContext;
       if (context != null) {
@@ -128,6 +137,18 @@ class ProfileController extends GetxController {
       if (currentProfile.value == null) {
         currentProfile.value = newProfile;
         await _saveCurrentProfileId(newProfile.id!);
+        
+        // Notifica outros controllers sobre a mudança de perfil
+        ProfileHelper.notifyProfileChanged();
+        
+        // Força navegação para MainLayout com a aba Profile ativa
+        Future.delayed(const Duration(milliseconds: 100), () {
+          final mainLayout = Get.find<GlobalStateController>();
+          mainLayout.notifyProfileUpdate();
+          
+          // Navega para MainLayout com tab do perfil
+          Get.offAll(() => const MainLayout(initialIndex: 2));
+        });
       }
 
       final context = Get.overlayContext;
@@ -163,9 +184,19 @@ class ProfileController extends GetxController {
         whereArgs: [profile.id],
       );
 
-      // 2. *** A GRANDE MUDANÇA ***
-      // Recarrega todos os perfis e o perfil atual a partir do banco de dados.
-      // Isso garante que a UI receba os dados mais recentes, sem inconsistências.
+      final index = profiles.indexWhere((p) => p.id == profile.id);
+
+      if (index != -1) {
+
+        profiles[index] = profile;
+        if (currentProfile.value?.id == profile.id) {
+          _clearImageCache();
+          await _reloadCurrentProfile(profile.id!);
+        }
+
+        profiles.refresh(); // Força atualização da lista após tudo
+
+      }
       await refresh();
 
       final context = Get.overlayContext;

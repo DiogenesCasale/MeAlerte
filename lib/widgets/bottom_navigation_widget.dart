@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:app_remedio/utils/constants.dart';
 import 'package:app_remedio/controllers/theme_controller.dart';
+import 'package:app_remedio/controllers/global_state_controller.dart';
 
 class BottomNavigationWidget extends StatelessWidget {
   final int currentIndex;
@@ -20,6 +21,14 @@ class BottomNavigationWidget extends StatelessWidget {
     return Obx(() {
       // Forçar rebuild quando tema muda
       themeController.isDarkMode;
+      
+      // Forçar rebuild quando perfil muda
+      try {
+        final globalController = Get.find<GlobalStateController>();
+        globalController.profileUpdateCounter;
+      } catch (e) {
+        // GlobalStateController não está disponível
+      }
       
       return Container(
         decoration: BoxDecoration(
