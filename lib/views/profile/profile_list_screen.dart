@@ -237,7 +237,7 @@ class ProfileListScreen extends StatelessWidget {
                 }
                 break;
               case 'edit':
-                Get.to(() => EditProfileScreen(profile: profile));
+                Get.to(() => EditProfileScreen(profileInitial: profile));
                 break;
               case 'delete':
                 await controller.deleteProfile(profile);

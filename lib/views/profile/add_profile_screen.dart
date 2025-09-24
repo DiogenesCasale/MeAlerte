@@ -5,6 +5,10 @@ import 'package:app_remedio/models/profile_model.dart';
 import 'package:app_remedio/utils/constants.dart';
 import 'package:app_remedio/widgets/profile_image_widget.dart';
 import 'package:app_remedio/utils/widgets_default.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
+import 'dart:io';
 
 class AddProfileScreen extends StatefulWidget {
   const AddProfileScreen({super.key});
@@ -255,11 +259,53 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
   }
 
   Future<void> _selectImage(ProfileController controller) async {
-    final imagePath = await controller.showImageSourceDialog();
-    if (imagePath != null) {
-      setState(() {
-        _imagePath = imagePath;
-      });
+     showModalBottomSheet(
+      context: context,
+      backgroundColor: surfaceColor,
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: <Widget>[
+            ListTile(
+              leading: Icon(Icons.photo_library, color: textColor),
+              title: Text('Galeria de Fotos', style: TextStyle(color: textColor)),
+              onTap: () {
+                _pickImage(ImageSource.gallery);
+                Navigator.of(context).pop();
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.photo_camera, color: textColor),
+              title: Text('Câmera', style: TextStyle(color: textColor)),
+              onTap: () {
+                _pickImage(ImageSource.camera);
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? pickedFile = await picker.pickImage(
+      source: source,
+      imageQuality: 80, // Comprime um pouco a imagem para economizar espaço
+      maxWidth: 1024,
+    );
+
+    if (pickedFile != null) {
+      // Salva a imagem no diretório seguro do app
+      final appDir = await getApplicationDocumentsDirectory();
+      final fileName = p.basename(pickedFile.path);
+      final savedImage = await File(pickedFile.path).copy('${appDir.path}/$fileName');
+      
+      if (mounted) {
+        setState(() {
+          _imagePath = savedImage.path;
+        });
+      }
     }
   }
 

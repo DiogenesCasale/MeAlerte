@@ -273,7 +273,7 @@ class ProfileScreen extends StatelessWidget {
             onTap: currentProfile != null
                 ? () {
                     // Apenas navegue. O controller agora gerencia 100% da atualização.
-                    Get.to(() => EditProfileScreen(profile: currentProfile));
+                    Get.to(() => EditProfileScreen(profileInitial: currentProfile));
                   }
                 : null,
           ),

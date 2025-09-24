@@ -374,42 +374,17 @@ class ProfileController extends GetxController {
     }
   }
 
-  /// Mostra diálogo para escolher fonte da imagem
-  Future<String?> showImageSourceDialog() async {
-    final result = await Get.dialog<String>(
-      AlertDialog(
-        title: const Text('Escolher Foto'),
-        content: const Text('Como você deseja adicionar a foto?'),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(result: null),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Get.back(result: 'gallery');
-            },
-            child: const Text('Galeria'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Get.back(result: 'camera');
-            },
-            child: const Text('Câmera'),
-          ),
-        ],
-      ),
-      barrierDismissible: false,
+  Future<Profile?> getProfileById(int? id) async {
+    final db = await _dbController.database;
+    final result = await db.query(
+      'tblPerfil',
+      where: 'id = ?',
+      whereArgs: [id],
     );
 
-    if (result == null) return null;
-
-    if (result == 'gallery') {
-      return await pickImageFromGallery();
-    } else if (result == 'camera') {
-      return await takePhotoFromCamera();
+    if (result.isNotEmpty) {
+      return Profile.fromMap(result.first);
     }
-
     return null;
   }
 
