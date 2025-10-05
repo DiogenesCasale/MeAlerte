@@ -243,7 +243,7 @@ class MedicationController extends GetxController {
     // NOVO: Cria um registro no histórico de estoque
     final historyEntry = StockHistory(
       medicationId: medicationId,
-      profileId: ProfileHelper.currentProfileId!,
+      profileId: ProfileHelper.currentProfileId,
       type: StockMovementType.entrada,
       quantity: amountToAdd,
       creationDate: DateTime.now(),
@@ -284,7 +284,7 @@ class MedicationController extends GetxController {
     // NOVO: Cria um registro no histórico de estoque
     final historyEntry = StockHistory(
       medicationId: medicationId,
-      profileId: ProfileHelper.currentProfileId!,
+      profileId: ProfileHelper.currentProfileId,
       takenDoseId: takenDoseId, // Vincula à dose tomada
       type: StockMovementType.saida,
       quantity: doseAmount.toInt(),
