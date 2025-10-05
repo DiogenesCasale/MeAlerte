@@ -225,6 +225,13 @@ class ProfileListScreen extends StatelessWidget {
                  ],
                ),
              ],
+             if (profile.perfilPadrao) ...[
+               const SizedBox(height: 4),
+               Text(
+                 'Perfil Padrão',
+                 style: TextStyle(fontSize: 12, color: primaryColor, fontWeight: FontWeight.w600),
+               ),
+             ],
            ],
          ),
         trailing: PopupMenuButton<String>(

@@ -7,6 +7,8 @@ class Profile {
   final bool deletado;
   final String? dataCriacao;
   final String? dataAtualizacao;
+  final bool perfilPadrao;
+  final String? mensagemCompartilhar;
 
   Profile({
     this.id,
@@ -17,6 +19,8 @@ class Profile {
     this.deletado = false,
     this.dataCriacao,
     this.dataAtualizacao,
+    this.perfilPadrao = false,
+    this.mensagemCompartilhar,
   });
 
   static Profile fromMap(Map<String, dynamic> map) {
@@ -29,6 +33,8 @@ class Profile {
       deletado: (map['deletado'] ?? 0) == 1,
       dataCriacao: map['data_criacao'] ?? map['dataCriacao'],
       dataAtualizacao: map['data_atualizacao'] ?? map['dataAtualizacao'],
+      perfilPadrao: (map['perfilPadrao'] ?? 0) == 1,
+      mensagemCompartilhar: map['mensagemCompartilhar'],
     );
   }
 
@@ -42,6 +48,8 @@ class Profile {
       'caminhoImagem': caminhoImagem,
       'dataCriacao': dataCriacao ?? DateTime.now().toIso8601String(),
       'dataAtualizacao': DateTime.now().toIso8601String(),
+      'perfilPadrao': perfilPadrao ? 1 : 0,
+      'mensagemCompartilhar': mensagemCompartilhar,
     };
   }
 
@@ -54,6 +62,8 @@ class Profile {
     bool? deletado,
     String? dataCriacao,
     String? dataAtualizacao,
+    bool? perfilPadrao,
+    String? mensagemCompartilhar,
   }) {
     return Profile(
       id: id ?? this.id,
@@ -64,6 +74,8 @@ class Profile {
       deletado: deletado ?? this.deletado,
       dataCriacao: dataCriacao ?? this.dataCriacao,
       dataAtualizacao: dataAtualizacao ?? this.dataAtualizacao,
+      perfilPadrao: perfilPadrao ?? this.perfilPadrao,
+      mensagemCompartilhar: mensagemCompartilhar ?? this.mensagemCompartilhar,
     );
   }
 
@@ -89,7 +101,7 @@ class Profile {
 
   @override
   String toString() {
-    return 'Profile(id: $id, nome: $nome, dataNascimento: $dataNascimento, genero: $genero, caminhoImagem: $caminhoImagem, deletado: $deletado)';
+    return 'Profile(id: $id, nome: $nome, dataNascimento: $dataNascimento, genero: $genero, caminhoImagem: $caminhoImagem, deletado: $deletado, perfilPadrao: $perfilPadrao, mensagemCompartilhar: $mensagemCompartilhar)';
   }
 
   @override

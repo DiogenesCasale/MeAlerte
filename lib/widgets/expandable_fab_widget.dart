@@ -24,7 +24,8 @@ class ExpandableFab extends StatefulWidget {
   State<ExpandableFab> createState() => _ExpandableFabState();
 }
 
-class _ExpandableFabState extends State<ExpandableFab> with SingleTickerProviderStateMixin {
+class _ExpandableFabState extends State<ExpandableFab>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _expandAnimation;
   bool _open = false;
@@ -82,7 +83,7 @@ class _ExpandableFabState extends State<ExpandableFab> with SingleTickerProvider
     return Obx(() {
       // Forçar rebuild quando tema muda
       themeController.isDarkMode;
-      
+
       return AnimatedOpacity(
         opacity: _open ? 1.0 : 0.0,
         duration: const Duration(milliseconds: 250),
@@ -97,40 +98,40 @@ class _ExpandableFabState extends State<ExpandableFab> with SingleTickerProvider
     });
   }
 
-  List<Widget> _buildExpandingActionButtons() {
-    final children = <Widget>[];
-    final count = widget.children.length;
-    final step = 90.0 / (count > 1 ? count - 1 : 1);
-    for (var i = 0, angleInDegrees = 90.0; i < count; i++, angleInDegrees -= step) {
-      children.add(
-        _ExpandingActionButton(
-          directionInDegrees: angleInDegrees,
-          maxDistance: widget.distance,
-          progress: _expandAnimation,
-          onTap: () {
-            // Fecha o menu ao clicar em uma opção
-            _toggle();
-            // Executa a ação do botão
-            widget.children[i].onPressed();
-          },
-          child: widget.children[i],
-        ),
-      );
-    }
-    return children;
+List<Widget> _buildExpandingActionButtons() {
+  final children = <Widget>[];
+  for (var i = 0; i < widget.children.length; i++) {
+    children.add(
+      _ExpandingActionButton(
+        index: i, // <-- Passando o índice do botão
+        itemCount: widget.children.length, // <-- Passando o total de itens
+        progress: _expandAnimation,
+        onTap: () {
+          _toggle();
+          widget.children[i].onPressed();
+        },
+        child: widget.children[i],
+      ),
+    );
   }
+  return children;
+}
 
   Widget _buildTapToOpenFab() {
     final themeController = Get.find<ThemeController>();
     return Obx(() {
       // Forçar rebuild quando tema muda
       themeController.isDarkMode;
-      
+
       return IgnorePointer(
         ignoring: _open,
         child: AnimatedContainer(
           transformAlignment: Alignment.center,
-          transform: Matrix4.diagonal3Values(_open ? 0.7 : 1.0, _open ? 0.7 : 1.0, 1.0),
+          transform: Matrix4.diagonal3Values(
+            _open ? 0.7 : 1.0,
+            _open ? 0.7 : 1.0,
+            1.0,
+          ),
           duration: const Duration(milliseconds: 250),
           curve: const Interval(0.0, 0.5, curve: Curves.easeOut),
           child: AnimatedOpacity(
@@ -150,19 +151,20 @@ class _ExpandableFabState extends State<ExpandableFab> with SingleTickerProvider
     });
   }
 }
+// Substitua toda a classe _ExpandingActionButton
 
 @immutable
 class _ExpandingActionButton extends StatelessWidget {
   const _ExpandingActionButton({
-    required this.directionInDegrees,
-    required this.maxDistance,
+    required this.index,
+    required this.itemCount,
     required this.progress,
     required this.child,
     required this.onTap,
   });
 
-  final double directionInDegrees;
-  final double maxDistance;
+  final int index;
+  final int itemCount;
   final Animation<double> progress;
   final ActionButtonModel child;
   final VoidCallback onTap;
@@ -172,63 +174,65 @@ class _ExpandingActionButton extends StatelessWidget {
     return AnimatedBuilder(
       animation: progress,
       builder: (context, _) {
-        final pos = Offset.fromDirection(
-          directionInDegrees * (math.pi / 180.0),
-          progress.value * maxDistance,
-        );
+        // Distância vertical entre o centro de cada botão
+        const double buttonSpacing = 68.0; 
+        // Distância inicial do primeiro botão em relação ao FAB principal
+        const double initialOffset = 65.0; 
+
+        // Calcula a posição vertical para este botão específico
+        // Multiplicamos o espaçamento pelo índice e adicionamos o offset inicial
+        final bottomPosition = initialOffset + (buttonSpacing * index);
+        
+        // Aplica a animação à posição calculada
+        final animatedBottom = progress.value * bottomPosition;
+
         return Positioned(
-          right: 4.0 + pos.dx,
-          bottom: 4.0 + pos.dy,
-          child: Transform.scale(
-            scale: progress.value,
-            child: Opacity(
-              opacity: progress.value,
+          bottom: animatedBottom,
+          right: 0, // Um pequeno ajuste para centralizar com o FAB
+          child: Opacity(
+            opacity: progress.value,
+            child: Transform.scale(
+              scale: progress.value,
+              alignment: Alignment.center,
               child: Material(
                 color: Colors.transparent,
                 child: InkWell(
                   onTap: onTap,
-                  borderRadius: BorderRadius.circular(28.0),
-                  child: Container(
-                    constraints: const BoxConstraints(
-                      maxWidth: 200, // Limita a largura máxima
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        if (child.label != null)
-                          Container(
-                            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
-                            margin: const EdgeInsets.only(right: 8.0),
-                            decoration: BoxDecoration(
-                              color: surfaceColor,
-                              borderRadius: BorderRadius.circular(8.0),
-                              boxShadow: [
-                                BoxShadow(
-                                  blurRadius: 6.0,
-                                  color: Colors.black.withValues(alpha: 0.15),
-                                  offset: const Offset(0, 2),
-                                )
-                              ],
-                            ),
-                            child: Text(
-                              child.label!,
-                              style: TextStyle(
-                                color: textColor,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
+                  borderRadius: BorderRadius.circular(8.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      if (child.label != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 8.0, horizontal: 12.0),
+                          margin: const EdgeInsets.only(right: 16.0),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).cardColor,
+                            borderRadius: BorderRadius.circular(8.0),
+                            boxShadow: [
+                              BoxShadow(
+                                blurRadius: 4.0,
+                                color: Colors.black.withOpacity(0.15),
+                                offset: const Offset(0, 1),
+                              )
+                            ],
+                          ),
+                          child: Text(
+                            child.label!,
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                        FloatingActionButton.small(
-                          heroTag: null,
-                          backgroundColor: child.backgroundColor,
-                          onPressed: null, // A ação é tratada pelo InkWell
-                          child: child.icon,
                         ),
-                      ],
-                    ),
+                      FloatingActionButton(
+                        heroTag: null,
+                        backgroundColor: child.backgroundColor,
+                        onPressed: onTap,
+                        child: child.icon,
+                      ),
+                    ],
                   ),
                 ),
               ),

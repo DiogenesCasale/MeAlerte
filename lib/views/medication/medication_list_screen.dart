@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:app_remedio/views/medication/add_restock_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:app_remedio/controllers/medication_controller.dart';
@@ -169,7 +170,13 @@ class MedicationListScreen extends GetView<MedicationController> {
             ),
             icon: Icon(Icons.medication, color: Colors.white),
             label: 'Novo Medicamento',
-            backgroundColor: Colors.blue,
+            backgroundColor: primaryColor,
+          ),
+          ActionButtonModel(
+            onPressed: () => Get.to(() => const AddRestockScreen()),
+            icon: Icon(Icons.add, color: Colors.white),
+            label: 'Nova Reposição',
+            backgroundColor: primaryColor,
           ),
         ],
       ),

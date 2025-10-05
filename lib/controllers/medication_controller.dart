@@ -4,6 +4,8 @@ import 'package:get/get.dart';
 import 'package:app_remedio/controllers/database_controller.dart';
 import 'package:app_remedio/models/medication_model.dart';
 import 'package:app_remedio/controllers/profile_controller.dart';
+import 'package:app_remedio/models/stock_history_model.dart';
+import 'package:app_remedio/utils/profile_helper.dart';
 
 class MedicationController extends GetxController {
   // Instância do controlador de banco de dados
@@ -42,7 +44,7 @@ class MedicationController extends GetxController {
       ProfileController? profileController;
       int attempts = 0;
       const maxAttempts = 50; // 5 segundos máximo
-      
+
       while (profileController == null && attempts < maxAttempts) {
         try {
           profileController = Get.find<ProfileController>();
@@ -52,17 +54,17 @@ class MedicationController extends GetxController {
           attempts++;
         }
       }
-      
+
       if (profileController == null) {
         print('ProfileController não encontrado após aguardar');
         return;
       }
-      
+
       // Aguarda até o ProfileController terminar de carregar
       while (profileController.isLoading.value) {
         await Future.delayed(const Duration(milliseconds: 100));
       }
-      
+
       // Se há perfil disponível, carrega os dados
       if (profileController.currentProfile.value != null) {
         await _initializeData();
@@ -119,14 +121,18 @@ class MedicationController extends GetxController {
       final db = await _dbController.database;
       final profileController = Get.find<ProfileController>();
 
-
       if (profileController.currentProfile.value == null) {
         print('Nenhum perfil selecionado');
         isLoading.value = false;
         return;
       }
 
-      final result = await db.query('tblMedicamentos', orderBy: 'nome ASC', where: 'deletado = 0 AND idPerfil = ?', whereArgs: [profileController.currentProfile.value!.id]);
+      final result = await db.query(
+        'tblMedicamentos',
+        orderBy: 'nome ASC',
+        where: 'deletado = 0 AND idPerfil = ?',
+        whereArgs: [profileController.currentProfile.value!.id],
+      );
       final medications = result
           .map((json) => Medication.fromMap(json))
           .toList();
@@ -213,10 +219,48 @@ class MedicationController extends GetxController {
     return null;
   }
 
-  /// Reduz o estoque do medicamento pela dose tomada
-  Future<void> reduceStock(int medicationId, double doseAmount) async {
+  Future<void> addStock(int medicationId, int amountToAdd) async {
     final db = await _dbController.database;
-    
+
+    final medication = await getMedicationById(medicationId);
+    if (medication == null) {
+      throw Exception('Medicamento com ID $medicationId não encontrado.');
+    }
+
+    final newStock = medication.estoque + amountToAdd;
+
+    // Atualiza o estoque na tabela principal
+    await db.update(
+      'tblMedicamentos',
+      {
+        'estoque': newStock,
+        'dataAtualizacao': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [medicationId],
+    );
+
+    // NOVO: Cria um registro no histórico de estoque
+    final historyEntry = StockHistory(
+      medicationId: medicationId,
+      profileId: ProfileHelper.currentProfileId!,
+      type: StockMovementType.entrada,
+      quantity: amountToAdd,
+      creationDate: DateTime.now(),
+    );
+    await db.insert('tblEstoqueMedicamento', historyEntry.toMap());
+
+    await fetchAllMedications();
+  }
+
+  /// Reduz o estoque do medicamento pela dose tomada
+  Future<void> reduceStock(
+    int medicationId,
+    double doseAmount,
+    int takenDoseId,
+  ) async {
+    final db = await _dbController.database;
+
     // Busca o medicamento atual
     final medication = await getMedicationById(medicationId);
     if (medication == null) {
@@ -225,11 +269,6 @@ class MedicationController extends GetxController {
 
     // Calcula o novo estoque
     final newStock = medication.estoque - doseAmount.toInt();
-    
-    // Não permite estoque negativo (opcional - pode ser removido se quiser permitir)
-    if (newStock < 0) {
-      print('⚠️ Aviso: Estoque do medicamento ${medication.nome} ficará negativo ($newStock)');
-    }
 
     // Atualiza o estoque no banco
     await db.update(
@@ -242,6 +281,17 @@ class MedicationController extends GetxController {
       whereArgs: [medicationId],
     );
 
+    // NOVO: Cria um registro no histórico de estoque
+    final historyEntry = StockHistory(
+      medicationId: medicationId,
+      profileId: ProfileHelper.currentProfileId!,
+      takenDoseId: takenDoseId, // Vincula à dose tomada
+      type: StockMovementType.saida,
+      quantity: doseAmount.toInt(),
+      creationDate: DateTime.now(),
+    );
+    await db.insert('tblEstoqueMedicamento', historyEntry.toMap());
+
     // Atualiza a lista de medicamentos
     await fetchAllMedications();
 
@@ -249,21 +299,52 @@ class MedicationController extends GetxController {
     final isLow = await isLowStock(medicationId);
     if (isLow) {
       final daysRemaining = await getDaysRemaining(medicationId);
-      final daysText = daysRemaining < 1 
-        ? "menos de 1 dia" 
-        : "${daysRemaining.toStringAsFixed(1)} dias";
-      
-      print('⚠️ ALERTA: Estoque baixo do medicamento ${medication.nome}! Restam aproximadamente $daysText de uso.');
-      
-      // Aqui você pode adicionar notificação ou toast se necessário
-      // Por exemplo, usando Get.snackbar ou um serviço de notificação
+      final daysText = daysRemaining < 1
+          ? "menos de 1 dia"
+          : "${daysRemaining.toStringAsFixed(1)} dias";
+
+      print(
+        '⚠️ ALERTA: Estoque baixo do medicamento ${medication.nome}! Restam aproximadamente $daysText de uso.',
+      );
     }
   }
 
-  /// Reverte a redução do estoque (quando desmarcar como tomado)
-  Future<void> restoreStock(int medicationId, double doseAmount) async {
+  // ADICIONE ESTE NOVO MÉTODO PARA BUSCAR O HISTÓRICO:
+  /// Busca o histórico de movimentações de estoque, com filtro opcional por medicamento.
+  Future<List<StockHistory>> getStockHistory({int? medicationId}) async {
     final db = await _dbController.database;
-    
+    final profileId = ProfileHelper.currentProfileId;
+
+    // Usamos uma query com JOIN para buscar o nome do medicamento junto com o histórico
+    String query = '''
+    SELECT h.*, m.nome as nomeMedicamento 
+    FROM tblEstoqueMedicamento h
+    JOIN tblMedicamentos m ON h.idMedicamento = m.id
+    WHERE h.deletado = 0 AND h.idPerfil = ?
+  ''';
+
+    List<dynamic> args = [profileId];
+
+    if (medicationId != null) {
+      query += ' AND h.idMedicamento = ?';
+      args.add(medicationId);
+    }
+
+    query += ' ORDER BY h.dataCriacao DESC';
+
+    final result = await db.rawQuery(query, args);
+
+    return result.map((map) => StockHistory.fromMap(map)).toList();
+  }
+
+  /// Reverte a redução do estoque (quando desmarcar como tomado)
+  Future<void> restoreStock(
+    int medicationId,
+    double doseAmount,
+    int takenDoseId,
+  ) async {
+    final db = await _dbController.database;
+
     // Busca o medicamento atual
     final medication = await getMedicationById(medicationId);
     if (medication == null) {
@@ -284,6 +365,13 @@ class MedicationController extends GetxController {
       whereArgs: [medicationId],
     );
 
+    await db.update(
+      'tblEstoqueMedicamento',
+      {'deletado': 1},
+      where: 'idDoseTomada = ? AND tipo = ?',
+      whereArgs: [takenDoseId, StockMovementType.saida.name],
+    );
+
     // Atualiza a lista de medicamentos
     await fetchAllMedications();
   }
@@ -291,17 +379,20 @@ class MedicationController extends GetxController {
   /// Verifica se um medicamento está com estoque baixo baseado nos agendamentos
   Future<bool> isLowStock(int medicationId, {int daysThreshold = 7}) async {
     final db = await _dbController.database;
-    
+
     // Busca o medicamento
     final medication = await getMedicationById(medicationId);
     if (medication == null) return false;
 
     // Busca todos os agendamentos ativos para este medicamento
-    final schedulesResult = await db.rawQuery('''
+    final schedulesResult = await db.rawQuery(
+      '''
       SELECT dose, intervalo, dataInicio, dataFim, paraSempre
       FROM tblMedicamentosAgendados 
       WHERE idMedicamento = ? AND deletado = 0
-    ''', [medicationId]);
+    ''',
+      [medicationId],
+    );
 
     if (schedulesResult.isEmpty) return false;
 
@@ -311,12 +402,12 @@ class MedicationController extends GetxController {
     for (var schedule in schedulesResult) {
       final dose = schedule['dose'] as double;
       final interval = schedule['intervalo'] as int;
-      final startDate = schedule['dataInicio'] != null 
-        ? DateTime.parse(schedule['dataInicio'] as String)
-        : now;
-      final endDate = schedule['dataFim'] != null 
-        ? DateTime.parse(schedule['dataFim'] as String)
-        : null;
+      final startDate = schedule['dataInicio'] != null
+          ? DateTime.parse(schedule['dataInicio'] as String)
+          : now;
+      final endDate = schedule['dataFim'] != null
+          ? DateTime.parse(schedule['dataFim'] as String)
+          : null;
       final isForever = (schedule['paraSempre'] as int) == 1;
 
       // Verifica se o agendamento ainda está ativo
@@ -337,22 +428,25 @@ class MedicationController extends GetxController {
 
     // Calcula quantos dias o estoque atual durará
     final daysRemaining = medication.estoque / totalDailyDose;
-    
+
     return daysRemaining <= daysThreshold;
   }
 
   /// Calcula quantos dias restam de medicamento baseado no uso atual
   Future<double> getDaysRemaining(int medicationId) async {
     final db = await _dbController.database;
-    
+
     final medication = await getMedicationById(medicationId);
     if (medication == null) return 0;
 
-    final schedulesResult = await db.rawQuery('''
+    final schedulesResult = await db.rawQuery(
+      '''
       SELECT dose, intervalo, dataInicio, dataFim, paraSempre
       FROM tblMedicamentosAgendados 
       WHERE idMedicamento = ? AND deletado = 0
-    ''', [medicationId]);
+    ''',
+      [medicationId],
+    );
 
     if (schedulesResult.isEmpty) return double.infinity;
 
@@ -362,12 +456,12 @@ class MedicationController extends GetxController {
     for (var schedule in schedulesResult) {
       final dose = schedule['dose'] as double;
       final interval = schedule['intervalo'] as int;
-      final startDate = schedule['dataInicio'] != null 
-        ? DateTime.parse(schedule['dataInicio'] as String)
-        : now;
-      final endDate = schedule['dataFim'] != null 
-        ? DateTime.parse(schedule['dataFim'] as String)
-        : null;
+      final startDate = schedule['dataInicio'] != null
+          ? DateTime.parse(schedule['dataInicio'] as String)
+          : now;
+      final endDate = schedule['dataFim'] != null
+          ? DateTime.parse(schedule['dataFim'] as String)
+          : null;
       final isForever = (schedule['paraSempre'] as int) == 1;
 
       bool isActive = startDate.isBefore(now.add(Duration(days: 1)));

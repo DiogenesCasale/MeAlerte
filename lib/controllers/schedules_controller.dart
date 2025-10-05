@@ -105,12 +105,13 @@ class SchedulesController extends GetxController {
       observacao: observacao,
     );
 
-    await db.insert('tblDosesTomadas', takenDose.toMap());
+    final takenId = await db.insert('tblDosesTomadas', takenDose.toMap());
+
 
     // Reduz o estoque do medicamento
     try {
       final medicationController = Get.find<MedicationController>();
-      await medicationController.reduceStock(dose.idMedicamento, dose.dose);
+      await medicationController.reduceStock(dose.idMedicamento, dose.dose, takenId);
     } catch (e) {
       print('Erro ao reduzir estoque: $e');
       // Continua mesmo se houver erro na redução do estoque
@@ -142,7 +143,7 @@ class SchedulesController extends GetxController {
       // Restaura o estoque do medicamento
       try {
         final medicationController = Get.find<MedicationController>();
-        await medicationController.restoreStock(medicationId, dose);
+        await medicationController.restoreStock(medicationId, dose, takenDoseId);
       } catch (e) {
         print('Erro ao restaurar estoque: $e');
         // Continua mesmo se houver erro na restauração do estoque
@@ -385,21 +386,17 @@ class SchedulesController extends GetxController {
             minute,
           );
 
-          // Define o fim do dia alvo para o loop
           final targetDateEnd = targetDateOnly.add(const Duration(days: 1));
 
-          // Loop para encontrar as doses que caem no dia selecionado
           while (doseTime.isBefore(targetDateEnd)) {
-            // Verifica se a dose calculada está no dia alvo
             if (doseTime.year == targetDateOnly.year &&
                 doseTime.month == targetDateOnly.month &&
                 doseTime.day == targetDateOnly.day) {
-              // A dose está no dia, então vamos adicioná-la
               final timeKey = DateFormat('HH:mm').format(doseTime);
 
               final takenKey = '${scheduled.id}_$timeKey';
               if (excludedDosesSet.contains(takenKey)) {
-                // Pula esta dose, pois foi excluída individualmente
+                // Pula esta dose
               } else {
                 final takenDoseId = takenDosesMap[takenKey];
                 final hasTakenDose = takenDoseId != null;
@@ -421,8 +418,7 @@ class SchedulesController extends GetxController {
               }
             }
 
-            // Prepara para a próxima iteração
-            if (scheduled.intervalo <= 0) break; // Evita loop infinito
+            if (scheduled.intervalo <= 0) break;
             doseTime = doseTime.add(Duration(hours: scheduled.intervalo));
           }
         } catch (e) {
@@ -430,9 +426,59 @@ class SchedulesController extends GetxController {
         }
       }
 
-      final sortedKeys = generatedDoses.keys.toList()..sort();
-      final sortedMap = {for (var k in sortedKeys) k: generatedDoses[k]!};
+      // --- MUDANÇA PRINCIPAL AQUI ---
+      
+      // 1. Pega as chaves de horário (ex: "08:00") e ordena com uma lógica customizada
+      final sortedKeys = generatedDoses.keys.toList();
+
+      sortedKeys.sort((keyA, keyB) {
+        final dosesA = generatedDoses[keyA]!;
+        final dosesB = generatedDoses[keyB]!;
+
+        // Um grupo é considerado "concluído" se TODAS as suas doses foram tomadas
+        final bool isGroupADone =
+            dosesA.every((d) => d.status == MedicationStatus.taken);
+        final bool isGroupBDone =
+            dosesB.every((d) => d.status == MedicationStatus.taken);
+
+        // Critério primário: move os grupos concluídos para o final
+        if (isGroupADone && !isGroupBDone) {
+          return 1; // Grupo A (concluído) vem DEPOIS do Grupo B
+        }
+        if (!isGroupADone && isGroupBDone) {
+          return -1; // Grupo A (não concluído) vem ANTES do Grupo B
+        }
+
+        // Critério secundário: se o status for o mesmo, ordena por horário
+        return keyA.compareTo(keyB);
+      });
+      
+      final sortedMap = <String, List<TodayDose>>{};
+
+      // 2. Itera sobre os horários já na ordem correta
+      for (var key in sortedKeys) {
+        final dosesForTime = generatedDoses[key]!;
+
+        // 3. Ordena a lista de doses DENTRO de cada horário (para consistência)
+        dosesForTime.sort((a, b) {
+          final isATaken = a.status == MedicationStatus.taken;
+          final isBTaken = b.status == MedicationStatus.taken;
+
+          if (isATaken && !isBTaken) {
+            return 1; // 'a' (tomado) vai para o fim
+          } else if (!isATaken && isBTaken) {
+            return -1; // 'a' (não tomado) vem primeiro
+          } else {
+            // Se ambos tiverem o mesmo status, ordena por nome
+            return a.medicationName.compareTo(b.medicationName);
+          }
+        });
+
+        sortedMap[key] = dosesForTime;
+      }
+
       groupedDoses.value = sortedMap;
+
     } finally {
       isLoading(false);
     }

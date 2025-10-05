@@ -8,6 +8,7 @@ import 'package:app_remedio/views/profile/edit_profile_screen.dart';
 import 'package:app_remedio/views/settings_screen.dart';
 import 'package:app_remedio/views/health_data/health_data_list_screen.dart';
 import 'package:app_remedio/utils/toast_service.dart';
+import 'package:app_remedio/views/medication/stock_history_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   final bool showBackButton;
@@ -329,7 +330,7 @@ class ProfileScreen extends StatelessWidget {
             icon: Icons.inventory,
             title: 'Reposições',
             subtitle: 'Controle de reposição de medicamentos',
-            onTap: () => _showFeatureInDevelopment('Reposições', context),
+            onTap: () => Get.to(() => const StockHistoryScreen()), // Temporário
           ),
           _buildDivider(),
           _buildSettingsTile(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app_remedio/utils/constants.dart';
@@ -71,6 +72,12 @@ class ThemeController extends GetxController {
     } catch (e) {
       print('GlobalStateController não encontrado: $e');
     }
+
+    // Notifica a status bar do sistema operacional
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+      statusBarColor: isDarkMode ? Colors.black : Colors.white,
+      statusBarIconBrightness: isDarkMode ? Brightness.light : Brightness.dark,
+    ));
     
     // SOLUÇÃO MAIS RADICAL: Força restart completo do GetMaterialApp
     Get.forceAppUpdate();

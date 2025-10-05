@@ -20,17 +20,20 @@ class AddProfileScreen extends StatefulWidget {
 class _AddProfileScreenState extends State<AddProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nomeController = TextEditingController();
+  final _mensagemCompartilharController = TextEditingController(text: defaultMessageTemplate);
+
 
   DateTime? _dataNascimento;
-
   String? _selectedGenero;
   String? _imagePath;
+  bool _perfilPadrao = false;
 
   final List<String> _generos = ['Masculino', 'Feminino', 'Outro'];
 
   @override
   void dispose() {
     _nomeController.dispose();
+    _mensagemCompartilharController.dispose();
     super.dispose();
   }
 
@@ -195,6 +198,26 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
           },
         ),
 
+        const SizedBox(height: 20),
+
+        const SizedBox(height: 8),
+        WidgetsDefault.buildTextField(
+          controller: _mensagemCompartilharController,
+          label: 'Mensagem de Compartilhamento',
+          hint: 'Ex: Olá, segue abaixo o lembrete de medicamento',
+        ),
+
+        const SizedBox(height: 10),
+        SwitchListTile(
+          title: Text('Perfil Padrão', style: heading2Style),
+          value: _perfilPadrao,
+          onChanged: (value) {
+            setState(() {
+              _perfilPadrao = value;
+            });
+          },
+        ),
+
       ],
     );
   }
@@ -344,6 +367,8 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
       dataNascimento: dataNascimentoISO,
       genero: _selectedGenero,
       caminhoImagem: _imagePath,
+      perfilPadrao: _perfilPadrao,
+      mensagemCompartilhar: _mensagemCompartilharController.text.trim(),
     );
 
     final success = await controller.createProfile(profile);

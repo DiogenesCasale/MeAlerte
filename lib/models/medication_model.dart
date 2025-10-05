@@ -104,4 +104,15 @@ class Medication {
       dataAtualizacao: dataAtualizacao,
     );
   }
+
+    @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+  
+    return other is Medication &&
+      other.id == id;
+  }
+
+  @override
+  int get hashCode => id.hashCode;
 }

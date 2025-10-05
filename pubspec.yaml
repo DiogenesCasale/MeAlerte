@@ -1,7 +1,7 @@
 name: app_remedio
 description: "A new Flutter project."
 publish_to: 'none'
-version: 0.2.4
+version: 0.3.0
 
 environment:
   sdk: ^3.9.0
@@ -15,12 +15,14 @@ dependencies:
   path: ^1.8.3 # Para manipular caminhos de arquivos
   intl: ^0.20.2 # Internacionalização
   get: ^4.6.6 # Injeção de dependências
-  shared_preferences: ^2.2.2 # Para salvar o perfil atual
+  shared_preferences: ^2.2.2 # Para salvar o perfil atual e as configurações
   image_picker: ^1.2.0 # Para selecionar imagens do dispositivo
   path_provider: ^2.1.5 # Para salvar imagens do dispositivo
   local_auth: ^2.1.8 # Biometria - Permite usar a autenticação biométrica/senha do dispositivo
   scrollable_positioned_list: ^0.3.8 # Para a rolagem da lista de datas na tela de agendamentos
   package_info_plus: ^9.0.0
+  url_launcher: ^6.2.6 # Para abrir links externos
+  share_plus: ^9.0.0 # Para compartilhar textos, imagens e arquivos
 
 dev_dependencies:
   flutter_test:

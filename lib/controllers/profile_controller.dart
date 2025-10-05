@@ -63,14 +63,24 @@ class ProfileController extends GetxController {
   /// Carrega o perfil atual das preferências
   Future<void> _loadCurrentProfile() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final profileId = prefs.getInt(_currentProfileKey);
+      // Tenta carregar o perfil padrão do banco de dados, se não encontrar, carrega o perfil usado anteriormente
+      final db = await _dbController.database;
+      final result = await db.query(
+        'tblPerfil',
+        where: 'perfilPadrao = ?',
+        whereArgs: [1],
+      );
+      if (result.isNotEmpty) {
+        currentProfile.value = Profile.fromMap(result.first);
+      } else {
+        final prefs = await SharedPreferences.getInstance();
+        final profileId = prefs.getInt(_currentProfileKey);
 
-      if (profileId != null) {
-        final profile = profiles.firstWhereOrNull((p) => p.id == profileId);
-        currentProfile.value = profile;
+        if (profileId != null) {
+          final profile = profiles.firstWhereOrNull((p) => p.id == profileId);
+          currentProfile.value = profile;
+        }
       }
-
       // Se não houver perfil atual ou não encontrou, define o primeiro
       if (currentProfile.value == null && profiles.isNotEmpty) {
         await setCurrentProfile(profiles.first);
@@ -88,7 +98,7 @@ class ProfileController extends GetxController {
 
       // Notifica outros controllers sobre a mudança de perfil
       ProfileHelper.notifyProfileChanged();
-      
+
       // Força atualização global
       try {
         final globalController = Get.find<GlobalStateController>();
@@ -137,18 +147,35 @@ class ProfileController extends GetxController {
       if (currentProfile.value == null) {
         currentProfile.value = newProfile;
         await _saveCurrentProfileId(newProfile.id!);
-        
+
+        // Como é o primeiro perfil, define como perfil padrão
+        await db.update(
+          'tblPerfil',
+          {'perfilPadrao': 1},
+          where: 'id = ?',
+          whereArgs: [newProfile.id],
+        );
+
         // Notifica outros controllers sobre a mudança de perfil
         ProfileHelper.notifyProfileChanged();
-        
+
         // Força navegação para MainLayout com a aba Profile ativa
         Future.delayed(const Duration(milliseconds: 100), () {
           final mainLayout = Get.find<GlobalStateController>();
           mainLayout.notifyProfileUpdate();
-          
+
           // Navega para MainLayout com tab do perfil
           Get.offAll(() => const MainLayout(initialIndex: 2));
         });
+      }
+
+      if (profile.perfilPadrao) {
+        await db.update(
+          'tblPerfil',
+          {'perfilPadrao': 0},
+          where: 'id != ?',
+          whereArgs: [newProfile.id],
+        );
       }
 
       final context = Get.overlayContext;
@@ -184,10 +211,19 @@ class ProfileController extends GetxController {
         whereArgs: [profile.id],
       );
 
+      // 2. Marca outros perfis como não padrão se o perfil atual for padrão
+      if (profile.perfilPadrao) {
+        await db.update(
+          'tblPerfil',
+          {'perfilPadrao': 0},
+          where: 'id != ?',
+          whereArgs: [profile.id],
+        );
+      }
+
       final index = profiles.indexWhere((p) => p.id == profile.id);
 
       if (index != -1) {
-
         profiles[index] = profile;
         if (currentProfile.value?.id == profile.id) {
           _clearImageCache();
@@ -195,7 +231,6 @@ class ProfileController extends GetxController {
         }
 
         profiles.refresh(); // Força atualização da lista após tudo
-
       }
       await refresh();
 

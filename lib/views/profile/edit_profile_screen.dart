@@ -24,11 +24,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   // ✅ CORREÇÃO: Removido 'late final' para permitir inicialização posterior
   late TextEditingController _nomeController;
+  late TextEditingController _mensagemCompartilharController;
 
   DateTime? _dataNascimento;
   String? _selectedGenero;
   String? _imagePath;
   String? _originalImagePath;
+  bool? _perfilPadrao;
   
   late Future<Profile?> _loadProfileFuture;
   bool _fieldsInitialized = false; // ✅ CORREÇÃO: Flag para controlar a inicialização
@@ -50,9 +52,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   // Este método inicializa as variáveis e o controller
   void _initializeFields(Profile profile) {
     _nomeController = TextEditingController(text: profile.nome);
+    String mensagemCompartilhar = profile.mensagemCompartilhar?.trim() ?? '';
+    if (mensagemCompartilhar.isEmpty) {
+      mensagemCompartilhar = defaultMessageTemplate;
+    }
+    _mensagemCompartilharController = TextEditingController(text: mensagemCompartilhar);
     _selectedGenero = profile.genero;
     _imagePath = profile.caminhoImagem;
     _originalImagePath = profile.caminhoImagem;
+    _perfilPadrao = profile.perfilPadrao;
 
     if (profile.dataNascimento != null) {
       try {
@@ -68,6 +76,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     // ✅ CORREÇÃO: Verificação mais segura antes de chamar dispose
     if (_fieldsInitialized) {
       _nomeController.dispose();
+      _mensagemCompartilharController.dispose();
     }
     super.dispose();
   }
@@ -278,6 +287,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             });
           },
         ),
+        const SizedBox(height: 20),
+        WidgetsDefault.buildTextField(
+          controller: _mensagemCompartilharController,
+          label: 'Mensagem de Compartilhamento',
+          hint: 'Ex: Olá, segue abaixo o lembrete de medicamento',
+        ),
+        const SizedBox(height: 10),
+        SwitchListTile(
+          title: Text('Perfil Padrão', style: heading2Style),
+          value: _perfilPadrao ?? false,
+          onChanged: (value) {
+            setState(() {
+              _perfilPadrao = value;
+            });
+          },
+        ),
       ],
     );
   }
@@ -409,6 +434,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       dataNascimento: dataNascimentoISO,
       genero: _selectedGenero,
       caminhoImagem: _imagePath,
+      perfilPadrao: _perfilPadrao,
+      mensagemCompartilhar: _mensagemCompartilharController.text.trim(),
     );
 
     final success = await controller.updateProfile(updatedProfile);

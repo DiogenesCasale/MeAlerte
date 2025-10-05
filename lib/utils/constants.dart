@@ -37,6 +37,8 @@ TextStyle get heading1Style => TextStyle(
   color: textColor,
 );
 
+const String defaultMessageTemplate = 'Olá, segue o lembrete de medicamento: Tomar {remedio} ({dose}) às {hora}.';
+
 TextStyle get heading2Style => TextStyle(
   fontSize: 18,
   fontWeight: FontWeight.bold,
