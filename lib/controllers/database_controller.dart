@@ -88,47 +88,6 @@ class DatabaseController {
     print("Migração do banco de dados concluída com sucesso.");
   }
 
-  Future<void> debugPrintTableData(Database db, String tableName) async {
-    print("\n--- 🕵  [DEBUG] Conteúdo da Tabela: '$tableName' 🕵 ---");
-    try {
-      // 1. Executa a query para buscar todos os dados
-      final List<Map<String, dynamic>> results = await db.query(tableName);
-
-      // 2. Verifica se a tabela está vazia
-      if (results.isEmpty) {
-        final List<Map> tables = await db.rawQuery(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name='$tableName'",
-        );
-
-        if (tables.isNotEmpty) {
-          print("|| A tabela está vazia. ||");
-        } else {
-          print("|| A tabela não existe. ||");
-        }
-
-        print("--- Fim do conteúdo de '$tableName' ---\n");
-        return;
-      }
-
-      // 3. Monta e imprime o cabeçalho com os nomes das colunas
-      final columns = results.first.keys;
-      final header = columns.map((col) => col.padRight(15)).join(' | ');
-      print(header);
-      print('-' * header.length); // Linha separadora
-
-      // 4. Itera sobre cada linha e imprime os dados
-      for (final row in results) {
-        final rowValues = columns
-            .map((col) => (row[col]?.toString() ?? 'NULL').padRight(15))
-            .join(' | ');
-        print(rowValues);
-      }
-    } catch (e) {
-      print("🚨 Erro ao ler a tabela '$tableName': $e");
-    }
-    print("--- Fim do conteúdo de '$tableName' ---\n");
-  }
-
   Future<void> _migrateToV2(Database db) async {
     final batch = db.batch();
 
@@ -158,27 +117,33 @@ class DatabaseController {
       ''');
 
     // 4. Transferir os dados para a nova tabela tblMedicamentos
-    for (var dadosMedicamento in dadosMedicamentos) {
-      // Mapear os dados da tabela antiga para a nova
-      // Campos da v1: id, nome, quantidade, observacao, data_criacao
-      // Campos da v2: id, nome, estoque, tipo, deletado, idPerfil, caminhoImagem, observacao, dataCriacao, dataAtualizacao
-      batch.execute(
-        '''
+    if (dadosMedicamentos.isNotEmpty) {
+      print("Migrando dados de tblMedicamentos...");
+      for (var dadosMedicamento in dadosMedicamentos) {
+        // Mapear os dados da tabela antiga para a nova
+        // Campos da v1: id, nome, quantidade, observacao, data_criacao
+        // Campos da v2: id, nome, estoque, tipo, deletado, idPerfil, caminhoImagem, observacao, dataCriacao, dataAtualizacao
+        batch.execute(
+          '''
       INSERT INTO tblMedicamentos (id, nome, estoque, tipo, deletado, caminhoImagem, observacao, dataCriacao, dataAtualizacao)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       ''',
-        [
-          dadosMedicamento['id'], // Mantém o mesmo ID
-          dadosMedicamento['nome'],
-          dadosMedicamento['quantidade'], // Mapeia quantidade para estoque
-          'comprimido', // Valor padrão para tipo
-          0, // Valor padrão para não deletado
-          null, // caminhoImagem não existe na v1, então null
-          dadosMedicamento['observacao'],
-          dadosMedicamento['data_criacao'], // data_criacao mapeia para dataCriacao
-          dadosMedicamento['data_criacao'], // Usa data_criacao como dataAtualizacao inicial
-        ],
-      );
+          [
+            dadosMedicamento['id'], // Mantém o mesmo ID
+            dadosMedicamento['nome'],
+            dadosMedicamento['quantidade'] ??
+                0, // Mapeia quantidade para estoque
+            'comprimido', // Valor padrão para tipo
+            0, // Valor padrão para não deletado
+            null, // caminhoImagem não existe na v1, então null
+            dadosMedicamento['observacao'],
+            dadosMedicamento['data_criacao'] ??
+                '', // data_criacao mapeia para dataCriacao
+            dadosMedicamento['data_criacao'] ??
+                '', // Usa data_criacao como dataAtualizacao inicial
+          ],
+        );
+      }
     }
 
     // 5. Selecionar os dados existentes da tblMedicamentosAgendados
@@ -210,28 +175,52 @@ class DatabaseController {
       ''');
 
     // 8. Transferir os dados para a nova tabela tblMedicamentosAgendados
-    for (var dadosMedicamentoAgendado in dadosMedicamentosAgendados) {
-      batch.execute(
-        '''
+    if (dadosMedicamentosAgendados.isNotEmpty) {
+      print("Migrando dados de tblMedicamentosAgendados...");
+      for (var dadosMedicamentoAgendado in dadosMedicamentosAgendados) {
+        if (dadosMedicamentoAgendado['medicamento_id'] == null) {
+          print(
+            "⚠️ Aviso: Agendamento com ID ${dadosMedicamentoAgendado['id']} possui medicamento_id nulo. Pulando migração deste registro.",
+          );
+          continue; // Pula este registro
+        }
+
+        if (dadosMedicamentoAgendado['data_criacao'] == null) {
+          print(
+            "⚠️ Aviso: Agendamento com ID ${dadosMedicamentoAgendado['id']} possui data_criacao nulo. Pulando migração deste registro.",
+          );
+          continue; // Pula este registro
+        }
+
+        var dataFim =
+            dadosMedicamentoAgendado['dias'] != null &&
+                dadosMedicamentoAgendado['dias'] > 0
+            ? DateTime.parse(dadosMedicamentoAgendado['data_criacao'])
+                  .add(Duration(days: dadosMedicamentoAgendado['dias']))
+                  .toIso8601String()
+            : null;
+        batch.execute(
+          '''
         INSERT INTO tblMedicamentosAgendados (id, hora, dose, intervalo, dias, deletado, observacao, idMedicamento, dataInicio, dataFim, paraSempre, dataCriacao, dataAtualizacao)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''',
-        [
-          dadosMedicamentoAgendado['id'],
-          dadosMedicamentoAgendado['hora'],
-          dadosMedicamentoAgendado['dose'],
-          dadosMedicamentoAgendado['intervalo'],
-          dadosMedicamentoAgendado['dias'],
-          0,
-          dadosMedicamentoAgendado['observacao'],
-          dadosMedicamentoAgendado['medicamento_id'],
-          dadosMedicamentoAgendado['data_criacao'],
-          null,
-          0,
-          dadosMedicamentoAgendado['data_criacao'],
-          dadosMedicamentoAgendado['data_criacao'],
-        ],
-      );
+          [
+            dadosMedicamentoAgendado['id'],
+            dadosMedicamentoAgendado['hora'],
+            dadosMedicamentoAgendado['dose'],
+            dadosMedicamentoAgendado['intervalo'],
+            dadosMedicamentoAgendado['dias'],
+            0,
+            dadosMedicamentoAgendado['observacao'],
+            dadosMedicamentoAgendado['medicamento_id'],
+            dadosMedicamentoAgendado['data_criacao'],
+            dataFim,
+            0,
+            dadosMedicamentoAgendado['data_criacao'] ?? '',
+            dadosMedicamentoAgendado['data_criacao'] ?? '',
+          ],
+        );
+      }
     }
 
     // 9. Triggers para atualização das colunas dataAtualizacao
@@ -271,17 +260,17 @@ class DatabaseController {
 
     // Cria a nova tabela de perfil
     batch.execute('''
-    CREATE TABLE tblPerfil (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      nome TEXT NOT NULL,
-      dataNascimento TEXT NULL,
-      genero TEXT NULL,
-      caminhoImagem TEXT NULL,
-      deletado INTEGER DEFAULT 0,
-      dataCriacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      dataAtualizacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )
-  ''');
+      CREATE TABLE tblPerfil (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL,
+        dataNascimento TEXT NULL,
+        genero TEXT NULL,
+        caminhoImagem TEXT NULL,
+        deletado INTEGER DEFAULT 0,
+        dataCriacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        dataAtualizacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    ''');
 
     // Cria a nova tabela de dados de saúde
     batch.execute('''

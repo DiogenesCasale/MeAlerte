@@ -15,7 +15,7 @@ class NotificationController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    
+
     // --- ESTE É O PADRÃO REATIVO CORRETO ---
     // 1. Encontramos o ProfileController
     final profileController = Get.find<ProfileController>();
@@ -60,7 +60,6 @@ class NotificationController extends GetxController {
           .toList();
 
       unreadCount.value = notifications.where((n) => !n.lida).length;
-
     } catch (e) {
       print('❌ Erro ao carregar notificações: $e');
     } finally {
@@ -91,13 +90,14 @@ class NotificationController extends GetxController {
         'deletado': 0,
         'dataCriacao': DateTime.now().toIso8601String(),
       });
-      
+
       // Recarrega a lista para a nova notificação aparecer na tela
       await loadNotifications();
       return newId;
     } catch (e) {
       print('❌ Erro ao salvar notificação no banco: $e');
     }
+    return null;
   }
 
   /// Marca uma notificação como lida e atualiza a UI instantaneamente
@@ -105,8 +105,10 @@ class NotificationController extends GetxController {
     try {
       final db = await _dbController.database;
       await db.update(
-        'tblNotificacoes', {'lida': 1},
-        where: 'id = ?', whereArgs: [notificationId]
+        'tblNotificacoes',
+        {'lida': 1},
+        where: 'id = ?',
+        whereArgs: [notificationId],
       );
 
       final index = notifications.indexWhere((n) => n.id == notificationId);
@@ -125,10 +127,12 @@ class NotificationController extends GetxController {
     try {
       final db = await _dbController.database;
       await db.update(
-        'tblNotificacoes', {'lida': 0},
-        where: 'id = ?', whereArgs: [notificationId]
+        'tblNotificacoes',
+        {'lida': 0},
+        where: 'id = ?',
+        whereArgs: [notificationId],
       );
-      
+
       final index = notifications.indexWhere((n) => n.id == notificationId);
       if (index != -1) {
         notifications[index] = notifications[index].copyWith(lida: false);
@@ -145,8 +149,10 @@ class NotificationController extends GetxController {
     try {
       final db = await _dbController.database;
       await db.update(
-        'tblNotificacoes', {'deletado': 1},
-        where: 'id = ?', whereArgs: [notificationId]
+        'tblNotificacoes',
+        {'deletado': 1},
+        where: 'id = ?',
+        whereArgs: [notificationId],
       );
 
       // Remove da lista local para a UI atualizar na hora
@@ -156,20 +162,24 @@ class NotificationController extends GetxController {
       print('❌ Erro ao deletar notificação: $e');
     }
   }
-  
+
   /// Marca todas como lidas e atualiza a UI instantaneamente
   Future<void> markAllAsRead() async {
     try {
       final db = await _dbController.database;
       final profileId = Get.find<ProfileController>().currentProfile.value?.id;
       if (profileId == null) return;
-      
+
       await db.update(
-        'tblNotificacoes', {'lida': 1},
-        where: 'idPerfil = ? AND lida = 0', whereArgs: [profileId]
+        'tblNotificacoes',
+        {'lida': 1},
+        where: 'idPerfil = ? AND lida = 0',
+        whereArgs: [profileId],
       );
 
-      notifications.value = notifications.map((n) => n.copyWith(lida: true)).toList();
+      notifications.value = notifications
+          .map((n) => n.copyWith(lida: true))
+          .toList();
       unreadCount.value = 0;
     } catch (e) {
       print('❌ Erro ao marcar todas como lidas: $e');
@@ -183,19 +193,27 @@ class NotificationController extends GetxController {
       final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
 
       int count = await db.update(
-        'tblNotificacoes', {'deletado': 1},
-        where: 'dataCriacao < ?', whereArgs: [thirtyDaysAgo.toIso8601String()]
+        'tblNotificacoes',
+        {'deletado': 1},
+        where: 'dataCriacao < ?',
+        whereArgs: [thirtyDaysAgo.toIso8601String()],
       );
 
       final context = Get.overlayContext;
       if (context != null) {
         if (count > 0) {
-          ToastService.showSuccess(context, '$count notificações antigas foram limpas');
+          ToastService.showSuccess(
+            context,
+            '$count notificações antigas foram limpas',
+          );
         } else {
-          ToastService.showInfo(context, 'Não há notificações antigas para limpar');
+          ToastService.showInfo(
+            context,
+            'Não há notificações antigas para limpar',
+          );
         }
       }
-      
+
       // Recarrega a lista para remover as antigas da UI
       await loadNotifications();
     } catch (e) {
@@ -209,10 +227,12 @@ class NotificationController extends GetxController {
       final db = await _dbController.database;
       final profileId = Get.find<ProfileController>().currentProfile.value?.id;
       if (profileId == null) return;
-      
+
       int count = await db.update(
-        'tblNotificacoes', {'deletado': 1},
-        where: 'idPerfil = ?', whereArgs: [profileId]
+        'tblNotificacoes',
+        {'deletado': 1},
+        where: 'idPerfil = ?',
+        whereArgs: [profileId],
       );
 
       final context = Get.overlayContext;
@@ -223,12 +243,11 @@ class NotificationController extends GetxController {
           ToastService.showInfo(context, 'Não há notificações para limpar');
         }
       }
-      
+
       // Recarrega a lista para a UI ficar vazia
       await loadNotifications();
     } catch (e) {
       print('❌ Erro ao limpar todas as notificações: $e');
     }
   }
-
 }
