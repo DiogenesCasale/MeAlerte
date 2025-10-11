@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:app_remedio/controllers/theme_controller.dart';
 import 'package:app_remedio/utils/constants.dart';
-import 'package:package_info_plus/package_info_plus.dart'; // <-- MUDANÇA 1: Importar pacote
+import 'package:app_remedio/utils/notification_service.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:app_remedio/controllers/settings_controller.dart';
 
 // <-- MUDANÇA 2: Converter para StatefulWidget
 class SettingsScreen extends StatefulWidget {
@@ -14,8 +16,8 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  // <-- MUDANÇA 3: Variável para guardar a versão
   String _appVersion = 'Carregando...';
+  final settingsController = Get.find<SettingsController>();
 
   @override
   void initState() {
@@ -41,11 +43,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        automaticallyImplyLeading: widget.showBackButton, // <-- MUDANÇA: Usar widget.
-        leading: widget.showBackButton ? IconButton( // <-- MUDANÇA: Usar widget.
-          icon: Icon(Icons.arrow_back, color: textColor),
-          onPressed: () => Get.back(),
-        ) : null,
+        automaticallyImplyLeading:
+            widget.showBackButton, // <-- MUDANÇA: Usar widget.
+        leading: widget.showBackButton
+            ? IconButton(
+                // <-- MUDANÇA: Usar widget.
+                icon: Icon(Icons.arrow_back, color: textColor),
+                onPressed: () => Get.back(),
+              )
+            : null,
         title: Text(
           'Configurações',
           style: TextStyle(
@@ -56,14 +62,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         centerTitle: true,
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
+            // Seção Notificações
+            _buildSectionHeader('Notificações'),
+            const SizedBox(height: 12),
+            _buildNotificationsCard(),
+            const SizedBox(height: 32),
+
             // Seção Aparência
             _buildSectionHeader('Aparência'),
             const SizedBox(height: 12),
-            
+
             // Card do tema
             Container(
               decoration: BoxDecoration(
@@ -97,24 +109,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    Obx(() => Column(
-                      children: AppThemeMode.values.map((mode) => _buildThemeOption(
-                        mode,
-                        themeController.themeMode.value == mode,
-                        () => themeController.setThemeMode(mode),
-                      )).toList(),
-                    )),
+                    Obx(
+                      () => Column(
+                        children: AppThemeMode.values
+                            .map(
+                              (mode) => _buildThemeOption(
+                                mode,
+                                themeController.themeMode.value == mode,
+                                () => themeController.setThemeMode(mode),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ),
                   ],
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 32),
-            
+
             // Seção Sobre
             _buildSectionHeader('Sobre'),
             const SizedBox(height: 12),
-            
+
             Container(
               decoration: BoxDecoration(
                 color: surfaceColor,
@@ -145,9 +163,162 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // O resto do seu código (_buildSectionHeader, _buildSettingsTile, etc.)
-  // permanece exatamente o mesmo.
-  
+  Widget _buildNotificationsCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: surfaceColor,
+        borderRadius: BorderRadius.circular(12),
+        // ... sua sombra
+      ),
+      child: Obx(
+        () => Column(
+          // Usa Obx para reatividade
+          children: [
+            SwitchListTile(
+              title: const Text('Habilitar Notificações'),
+              value: settingsController.notificationsEnabled.value,
+              onChanged: settingsController.setNotificationsEnabled,
+              secondary: Icon(Icons.notifications_active, color: primaryColor),
+            ),
+            if (settingsController.notificationsEnabled.value) ...[
+              const Divider(height: 1, indent: 16, endIndent: 16),
+              SwitchListTile(
+                title: const Text('Vibrar'),
+                value: settingsController.vibrateEnabled.value,
+                onChanged: settingsController.setVibrate,
+                secondary: Icon(Icons.vibration, color: primaryColor),
+              ),
+              const Divider(height: 1, indent: 16, endIndent: 16),
+              ListTile(
+                leading: Icon(Icons.music_note, color: primaryColor),
+                title: const Text('Som da Notificação'),
+                trailing: DropdownButton<String>(
+                  value: settingsController.sound.value,
+                  items: const [
+                    DropdownMenuItem(value: 'default', child: Text('Padrão')),
+                    DropdownMenuItem(value: 'none', child: Text('Nenhum')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      settingsController.setSound(value);
+                    }
+                  },
+                ),
+              ),
+              const Divider(height: 1, indent: 16, endIndent: 16),
+              ListTile(
+                leading: Icon(Icons.alarm, color: primaryColor),
+                title: const Text('Lembrar antes'),
+                trailing: DropdownButton<int>(
+                  value: settingsController.timeBefore.value,
+                  items: const [
+                    DropdownMenuItem(value: 5, child: Text('5 min')),
+                    DropdownMenuItem(value: 10, child: Text('10 min')),
+                    DropdownMenuItem(value: 15, child: Text('15 min')),
+                    DropdownMenuItem(value: 30, child: Text('30 min')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      settingsController.setTimeBefore(value);
+                    }
+                  },
+                ),
+              ),
+              const Divider(height: 1, indent: 16, endIndent: 16),
+              ListTile(
+                leading: Icon(Icons.history, color: primaryColor),
+                title: const Text('Lembrar após (atraso)'),
+                trailing: DropdownButton<int>(
+                  value: settingsController.timeAfter.value,
+                  items: const [
+                    DropdownMenuItem(value: 15, child: Text('15 min')),
+                    DropdownMenuItem(value: 30, child: Text('30 min')),
+                    DropdownMenuItem(value: 60, child: Text('1 hora')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      settingsController.setTimeAfter(value);
+                    }
+                  },
+                ),
+              ),
+              const Divider(height: 1, indent: 16, endIndent: 16),
+              ListTile(
+                leading: Icon(Icons.edit, color: primaryColor),
+                title: const Text('Texto do Lembrete'),
+                subtitle: Text(
+                  settingsController.reminderText.value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                onTap: _showReminderTextDialog,
+              ),
+              const Divider(height: 1, indent: 16, endIndent: 16),
+              ListTile(
+                leading: Icon(Icons.notifications_active, color: primaryColor),
+                title: const Text('Testar Notificação'),
+                subtitle: const Text('Enviar uma notificação de teste'),
+                onTap: _testNotification,
+                trailing: Icon(Icons.arrow_forward_ios, size: 16, color: primaryColor),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // NOVO MÉTODO: Diálogo para editar texto
+  void _showReminderTextDialog() {
+    final textController = TextEditingController(
+      text: settingsController.reminderText.value,
+    );
+    Get.defaultDialog(
+      title: 'Editar Lembrete',
+      content: TextField(
+        controller: textController,
+        autofocus: true,
+        decoration: const InputDecoration(labelText: 'Texto da notificação'),
+      ),
+      actions: [
+        TextButton(onPressed: () => Get.back(), child: const Text('Cancelar')),
+        ElevatedButton(
+          onPressed: () {
+            settingsController.setReminderText(textController.text);
+            Get.back();
+          },
+          child: const Text('Salvar'),
+        ),
+      ],
+    );
+  }
+
+  // MÉTODO: Testar notificação
+  void _testNotification() async {
+    try {
+      final notificationService = NotificationService();
+      await notificationService.testNotification();
+      
+      Get.snackbar(
+        'Teste de Notificação',
+        'Notificação de teste enviada! Verifique se ela apareceu.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 3),
+      );
+    } catch (e) {
+      Get.snackbar(
+        'Erro',
+        'Erro ao enviar notificação de teste: $e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 3),
+      );
+    }
+  }
+
   Widget _buildSectionHeader(String title) {
     return Align(
       alignment: Alignment.centerLeft,
@@ -178,11 +349,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           color: primaryColor.withOpacity(0.1),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Icon(
-          icon,
-          color: primaryColor,
-          size: 20,
-        ),
+        child: Icon(icon, color: primaryColor, size: 20),
       ),
       title: Text(
         title,
@@ -195,28 +362,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
       subtitle: subtitle != null
           ? Text(
               subtitle,
-              style: TextStyle(
-                fontSize: 14,
-                color: textColor.withOpacity(0.6),
-              ),
+              style: TextStyle(fontSize: 14, color: textColor.withOpacity(0.6)),
             )
           : null,
-      trailing: trailing ??
+      trailing:
+          trailing ??
           (onTap != null
-              ? Icon(
-                  Icons.chevron_right,
-                  color: Colors.grey,
-                )
+              ? Icon(Icons.chevron_right, color: Colors.grey)
               : null),
       onTap: onTap,
     );
   }
 
-  Widget _buildThemeOption(AppThemeMode mode, bool isSelected, VoidCallback onTap) {
+  Widget _buildThemeOption(
+    AppThemeMode mode,
+    bool isSelected,
+    VoidCallback onTap,
+  ) {
     final themeName = _getThemeDisplayName(mode);
     final themeIcon = _getThemeIcon(mode);
     final themeDescription = _getThemeDescription(mode);
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
@@ -244,16 +410,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         subtitle: Text(
           themeDescription,
-          style: TextStyle(
-            color: textColor.withOpacity(0.6),
-            fontSize: 14,
-          ),
+          style: TextStyle(color: textColor.withOpacity(0.6), fontSize: 14),
         ),
-        trailing: isSelected ? Icon(
-          Icons.check_circle,
-          color: primaryColor,
-          size: 20,
-        ) : null,
+        trailing: isSelected
+            ? Icon(Icons.check_circle, color: primaryColor, size: 20)
+            : null,
       ),
     );
   }

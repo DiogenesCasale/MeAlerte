@@ -88,6 +88,47 @@ class DatabaseController {
     print("Migração do banco de dados concluída com sucesso.");
   }
 
+  Future<void> debugPrintTableData(Database db, String tableName) async {
+    print("\n--- 🕵  [DEBUG] Conteúdo da Tabela: '$tableName' 🕵 ---");
+    try {
+      // 1. Executa a query para buscar todos os dados
+      final List<Map<String, dynamic>> results = await db.query(tableName);
+
+      // 2. Verifica se a tabela está vazia
+      if (results.isEmpty) {
+        final List<Map> tables = await db.rawQuery(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='$tableName'",
+        );
+
+        if (tables.isNotEmpty) {
+          print("|| A tabela está vazia. ||");
+        } else {
+          print("|| A tabela não existe. ||");
+        }
+
+        print("--- Fim do conteúdo de '$tableName' ---\n");
+        return;
+      }
+
+      // 3. Monta e imprime o cabeçalho com os nomes das colunas
+      final columns = results.first.keys;
+      final header = columns.map((col) => col.padRight(15)).join(' | ');
+      print(header);
+      print('-' * header.length); // Linha separadora
+
+      // 4. Itera sobre cada linha e imprime os dados
+      for (final row in results) {
+        final rowValues = columns
+            .map((col) => (row[col]?.toString() ?? 'NULL').padRight(15))
+            .join(' | ');
+        print(rowValues);
+      }
+    } catch (e) {
+      print("🚨 Erro ao ler a tabela '$tableName': $e");
+    }
+    print("--- Fim do conteúdo de '$tableName' ---\n");
+  }
+
   Future<void> _migrateToV2(Database db) async {
     final batch = db.batch();
 
@@ -242,7 +283,7 @@ class DatabaseController {
     )
   ''');
 
-    // Cria a nova tabela de dados de saúde (Altura, Peso, Glicose, Pressão Arterial, Pulso, etc.)
+    // Cria a nova tabela de dados de saúde
     batch.execute('''
     CREATE TABLE tblDadosSaude (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -378,6 +419,49 @@ class DatabaseController {
         FOREIGN KEY (idPerfil) REFERENCES tblPerfil (id) ON DELETE CASCADE
       )
     ''');
+
+    batch.execute('''
+        CREATE TABLE tblNotificacoes (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          idPerfil INTEGER NOT NULL DEFAULT 1,
+          idAgendamento INTEGER,
+          horarioAgendado TEXT,
+          titulo TEXT NOT NULL,
+          mensagem TEXT NOT NULL,
+          lida INTEGER DEFAULT 0,
+          deletado INTEGER DEFAULT 0,
+          dataCriacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (idPerfil) REFERENCES tblPerfil (id) ON DELETE CASCADE,
+          FOREIGN KEY (idAgendamento) REFERENCES tblMedicamentosAgendados (id) ON DELETE CASCADE
+          )
+      ''');
+
+    batch.execute('''
+        CREATE TABLE tblAnotacoes (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          idPerfil INTEGER NOT NULL DEFAULT 1,
+          anotacao TEXT NOT NULL,
+          deletado INTEGER DEFAULT 0,
+          dataCriacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          dataAtualizacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (idPerfil) REFERENCES tblPerfil (id) ON DELETE CASCADE
+          )
+      ''');
+
+    batch.execute('''
+        CREATE TRIGGER updateDataAtualizacaoAnotacoes
+        AFTER UPDATE ON tblAnotacoes
+        FOR EACH ROW
+        BEGIN
+          UPDATE tblAnotacoes
+          SET dataAtualizacao = CURRENT_TIMESTAMP
+          WHERE id = OLD.id;
+        END;
+      ''');
+
+    batch.execute('''
+          ALTER TABLE tblMedicamentosAgendados ADD COLUMN idAgendamentoPai INTEGER NULL;
+        ''');
 
     try {
       await batch.commit();

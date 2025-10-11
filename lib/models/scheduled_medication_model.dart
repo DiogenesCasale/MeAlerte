@@ -14,7 +14,7 @@ class ScheduledMedication {
   final bool deletado; // Soft delete
   final String? medicationName; // Para joins
   final String? caminhoImagem; // Para joins
-  // Novos campos
+  final int? idAgendamentoPai;
   final String? dataAtualizacao;
 
   ScheduledMedication({
@@ -34,6 +34,7 @@ class ScheduledMedication {
     this.deletado = false,
     this.medicationName,
     this.caminhoImagem,
+    this.idAgendamentoPai,
   });
 
   Map<String, dynamic> toMap() {
@@ -52,6 +53,7 @@ class ScheduledMedication {
       'dataCriacao': dataCriacao ?? DateTime.now().toIso8601String(),
       'dataAtualizacao': dataAtualizacao ?? DateTime.now().toIso8601String(),
       'deletado': deletado ? 1 : 0,
+      'idAgendamentoPai': idAgendamentoPai,
     };
   }
 
@@ -71,6 +73,7 @@ class ScheduledMedication {
       dataCriacao: map['dataCriacao'],
       dataAtualizacao: map['dataAtualizacao'],
       deletado: (map['deletado'] ?? 0) == 1,
+      idAgendamentoPai: map['idAgendamentoPai'],
     );
   }
 
@@ -92,6 +95,7 @@ class ScheduledMedication {
       deletado: (map['deletado'] ?? 0) == 1,
       medicationName: map['medicationName'],
       caminhoImagem: map['caminhoImagem'],
+      idAgendamentoPai: map['idAgendamentoPai'],
     );
   }
 
@@ -115,6 +119,7 @@ class ScheduledMedication {
     bool? deletado,
     String? medicationName,
     String? caminhoImagem,
+    int? idAgendamentoPai,
   }) {
     return ScheduledMedication(
       // A lógica é: use o novo valor se ele não for nulo, senão, use o valor antigo (this.campo).
@@ -136,11 +141,12 @@ class ScheduledMedication {
       deletado: deletado ?? this.deletado,
       medicationName: medicationName ?? this.medicationName,
       caminhoImagem: caminhoImagem ?? this.caminhoImagem,
+      idAgendamentoPai: idAgendamentoPai ?? this.idAgendamentoPai,
     );
   }
 }
 
-/// Enum para representar os estados das medicações
+/// Enum para representar os estados das medicações/agendamentos
 enum MedicationStatus {
   notTaken('Não Tomado'),
   taken('Tomado'),

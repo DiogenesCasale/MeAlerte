@@ -20,8 +20,9 @@ class AddProfileScreen extends StatefulWidget {
 class _AddProfileScreenState extends State<AddProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nomeController = TextEditingController();
-  final _mensagemCompartilharController = TextEditingController(text: defaultMessageTemplate);
-
+  final _mensagemCompartilharController = TextEditingController(
+    text: defaultMessageTemplate,
+  );
 
   DateTime? _dataNascimento;
   String? _selectedGenero;
@@ -115,7 +116,6 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Nome
-        const SizedBox(height: 8),
         WidgetsDefault.buildTextField(
           controller: _nomeController,
           label: 'Nome *',
@@ -132,23 +132,54 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
           },
         ),
 
-        const SizedBox(height: 20),
+        const SizedBox(height: 10),
 
-        // Data de Nascimento
-        WidgetsDefault.buildDateField(
-          label: 'Data de Nascimento',
-          value: _dataNascimento,
-          onTap: _selectDate,
-          isRequired: false,
-          validator: (value) {
-            if (value != null && value.isAfter(DateTime.now())) {
-              return 'Data não pode ser no futuro';
-            }
-            return null;
-          },
+        Row(
+          crossAxisAlignment:
+              CrossAxisAlignment.end, // Alinha os itens pela base
+          children: [
+            // Coluna da Data de Nascimento
+            Expanded(
+              flex: 2, // Ocupa 2/3 do espaço
+              child: WidgetsDefault.buildDateField(
+                label: 'Data de Nascimento',
+                value: _dataNascimento,
+                onTap: _selectDate,
+                isRequired: false,
+                validator: (value) {
+                  if (value != null && value.isAfter(DateTime.now())) {
+                    return 'Data não pode ser no futuro';
+                  }
+                  return null;
+                },
+              ),
+            ),
+
+            const SizedBox(width: 10),
+
+            // Coluna do Perfil Padrão
+            Expanded(
+              flex: 1, // Ocupa 1/3 do espaço
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Padrão', style: heading2Style),
+                  const SizedBox(height: 4),
+                  Switch(
+                    value: _perfilPadrao,
+                    onChanged: (value) {
+                      setState(() {
+                        _perfilPadrao = value;
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
 
-        const SizedBox(height: 20),
+        const SizedBox(height: 10),
 
         // Gênero
         Text('Gênero', style: heading2Style),
@@ -198,27 +229,45 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
           },
         ),
 
-        const SizedBox(height: 20),
-
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         WidgetsDefault.buildTextField(
           controller: _mensagemCompartilharController,
           label: 'Mensagem de Compartilhamento',
           hint: 'Ex: Olá, segue abaixo o lembrete de medicamento',
+          maxLines: 3,
         ),
 
-        const SizedBox(height: 10),
-        SwitchListTile(
-          title: Text('Perfil Padrão', style: heading2Style),
-          value: _perfilPadrao,
-          onChanged: (value) {
-            setState(() {
-              _perfilPadrao = value;
-            });
-          },
+        // Botões das variáveis
+        Wrap(
+          spacing: 8.0, // Espaçamento horizontal entre os botões
+          runSpacing: 4.0, // Espaçamento vertical
+          children: variaveis.map((variavel) {
+            return ActionChip(
+              label: Text(variavel),
+              onPressed: () => _inserirVariavel(variavel),
+              backgroundColor: surfaceColor,
+              labelStyle: TextStyle(color: textColor, fontSize: 12),
+              side: BorderSide(color: textColor.withOpacity(0.2)),
+            );
+          }).toList(),
         ),
-
       ],
+    );
+  }
+
+  void _inserirVariavel(String variavel) {
+    final text = _mensagemCompartilharController.text;
+    final textSelection = _mensagemCompartilharController.selection;
+    final newText = text.replaceRange(
+      textSelection.start,
+      textSelection.end,
+      variavel,
+    );
+    final myTextLength = variavel.length;
+    _mensagemCompartilharController.text = newText;
+    _mensagemCompartilharController.selection = textSelection.copyWith(
+      baseOffset: textSelection.start + myTextLength,
+      extentOffset: textSelection.start + myTextLength,
     );
   }
 
@@ -282,7 +331,7 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
   }
 
   Future<void> _selectImage(ProfileController controller) async {
-     showModalBottomSheet(
+    showModalBottomSheet(
       context: context,
       backgroundColor: surfaceColor,
       builder: (context) => SafeArea(
@@ -290,7 +339,10 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
           children: <Widget>[
             ListTile(
               leading: Icon(Icons.photo_library, color: textColor),
-              title: Text('Galeria de Fotos', style: TextStyle(color: textColor)),
+              title: Text(
+                'Galeria de Fotos',
+                style: TextStyle(color: textColor),
+              ),
               onTap: () {
                 _pickImage(ImageSource.gallery);
                 Navigator.of(context).pop();
@@ -322,8 +374,10 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
       // Salva a imagem no diretório seguro do app
       final appDir = await getApplicationDocumentsDirectory();
       final fileName = p.basename(pickedFile.path);
-      final savedImage = await File(pickedFile.path).copy('${appDir.path}/$fileName');
-      
+      final savedImage = await File(
+        pickedFile.path,
+      ).copy('${appDir.path}/$fileName');
+
       if (mounted) {
         setState(() {
           _imagePath = savedImage.path;
@@ -335,7 +389,9 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
   Future<void> _selectDate() async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: _dataNascimento ?? DateTime.now().subtract(const Duration(days: 365 * 20)),
+      initialDate:
+          _dataNascimento ??
+          DateTime.now().subtract(const Duration(days: 365 * 20)),
       firstDate: DateTime(1900),
       lastDate: DateTime.now(),
       locale: const Locale('pt', 'BR'),

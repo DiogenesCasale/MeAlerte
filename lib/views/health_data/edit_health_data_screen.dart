@@ -8,11 +8,8 @@ import 'package:app_remedio/utils/toast_service.dart';
 
 class EditHealthDataScreen extends StatefulWidget {
   final HealthData healthData;
-  
-  const EditHealthDataScreen({
-    super.key,
-    required this.healthData,
-  });
+
+  const EditHealthDataScreen({super.key, required this.healthData});
 
   @override
   State<EditHealthDataScreen> createState() => _EditHealthDataScreenState();
@@ -24,7 +21,7 @@ class _EditHealthDataScreenState extends State<EditHealthDataScreen> {
   final _valorSistolicaController = TextEditingController();
   final _valorDiastolicaController = TextEditingController();
   final _observacaoController = TextEditingController();
-  
+
   late HealthDataType? _selectedType;
   late DateTime _selectedDate;
   late TimeOfDay _selectedTime;
@@ -40,18 +37,20 @@ class _EditHealthDataScreenState extends State<EditHealthDataScreen> {
 
   void _initializeData() {
     _selectedType = HealthDataType.fromString(widget.healthData.tipo);
-    
+
     final dataRegistro = widget.healthData.dataRegistroDateTime;
     _selectedDate = dataRegistro;
     _selectedTime = TimeOfDay.fromDateTime(dataRegistro);
-    
+
     if (_selectedType?.isPressaoArterial == true) {
-      _valorSistolicaController.text = widget.healthData.valorSistolica?.toString() ?? '';
-      _valorDiastolicaController.text = widget.healthData.valorDiastolica?.toString() ?? '';
+      _valorSistolicaController.text =
+          widget.healthData.valorSistolica?.toString() ?? '';
+      _valorDiastolicaController.text =
+          widget.healthData.valorDiastolica?.toString() ?? '';
     } else {
       _valorController.text = widget.healthData.valor?.toString() ?? '';
     }
-    
+
     _observacaoController.text = widget.healthData.observacao ?? '';
   }
 
@@ -94,16 +93,16 @@ class _EditHealthDataScreenState extends State<EditHealthDataScreen> {
             children: [
               _buildTypeInfo(),
               const SizedBox(height: 24),
-              
+
               _buildValueInputs(),
               const SizedBox(height: 24),
-              
+
               _buildDateTimeSelector(),
               const SizedBox(height: 24),
-              
+
               _buildObservationField(),
               const SizedBox(height: 32),
-              
+
               _buildSaveButton(),
             ],
           ),
@@ -219,7 +218,10 @@ class _EditHealthDataScreenState extends State<EditHealthDataScreen> {
                     decoration: defaultInputDecoration.copyWith(
                       labelText: 'Diastólica',
                       hintText: '80',
-                      prefixIcon: Icon(Icons.favorite_border, color: primaryColor),
+                      prefixIcon: Icon(
+                        Icons.favorite_border,
+                        color: primaryColor,
+                      ),
                     ),
                     keyboardType: TextInputType.number,
                     validator: (value) {
@@ -238,10 +240,7 @@ class _EditHealthDataScreenState extends State<EditHealthDataScreen> {
             const SizedBox(height: 8),
             Text(
               'Unidade: ${_selectedType!.unidade}',
-              style: TextStyle(
-                fontSize: 12,
-                color: textColor.withOpacity(0.6),
-              ),
+              style: TextStyle(fontSize: 12, color: textColor.withOpacity(0.6)),
             ),
           ],
         ),
@@ -277,7 +276,10 @@ class _EditHealthDataScreenState extends State<EditHealthDataScreen> {
               decoration: defaultInputDecoration.copyWith(
                 labelText: _selectedType!.label,
                 hintText: 'Digite o valor',
-                prefixIcon: Icon(_getIconForType(_selectedType!), color: primaryColor),
+                prefixIcon: Icon(
+                  _getIconForType(_selectedType!),
+                  color: primaryColor,
+                ),
                 suffixText: _selectedType!.unidade,
               ),
               keyboardType: TextInputType.number,
@@ -300,7 +302,7 @@ class _EditHealthDataScreenState extends State<EditHealthDataScreen> {
   Widget _buildDateTimeSelector() {
     final dateFormat = DateFormat('dd/MM/yyyy');
     final timeFormat = DateFormat('HH:mm');
-    
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -332,20 +334,26 @@ class _EditHealthDataScreenState extends State<EditHealthDataScreen> {
                 child: InkWell(
                   onTap: _selectDate,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 16,
+                      horizontal: 12,
+                    ),
                     decoration: BoxDecoration(
                       border: Border.all(color: Colors.grey.withOpacity(0.3)),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.calendar_today, color: primaryColor, size: 20),
+                        Icon(
+                          Icons.calendar_today,
+                          color: primaryColor,
+                          size: 20,
+                        ),
                         const SizedBox(width: 12),
-                        Text(
-                          dateFormat.format(_selectedDate),
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: textColor,
+                        Expanded(
+                          child: Text(
+                            dateFormat.format(_selectedDate),
+                            style: TextStyle(fontSize: 16, color: textColor),
                           ),
                         ),
                       ],
@@ -358,7 +366,10 @@ class _EditHealthDataScreenState extends State<EditHealthDataScreen> {
                 child: InkWell(
                   onTap: _selectTime,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 16,
+                      horizontal: 12,
+                    ),
                     decoration: BoxDecoration(
                       border: Border.all(color: Colors.grey.withOpacity(0.3)),
                       borderRadius: BorderRadius.circular(8),
@@ -367,11 +378,18 @@ class _EditHealthDataScreenState extends State<EditHealthDataScreen> {
                       children: [
                         Icon(Icons.access_time, color: primaryColor, size: 20),
                         const SizedBox(width: 12),
-                        Text(
-                          timeFormat.format(DateTime(2023, 1, 1, _selectedTime.hour, _selectedTime.minute)),
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: textColor,
+                        Expanded(
+                          child: Text(
+                            timeFormat.format(
+                              DateTime(
+                                2023,
+                                1,
+                                1,
+                                _selectedTime.hour,
+                                _selectedTime.minute,
+                              ),
+                            ),
+                            style: TextStyle(fontSize: 16, color: textColor),
                           ),
                         ),
                       ],
@@ -432,13 +450,16 @@ class _EditHealthDataScreenState extends State<EditHealthDataScreen> {
       width: double.infinity,
       child: ElevatedButton.icon(
         onPressed: _isLoading ? null : _updateHealthData,
-        icon: _isLoading 
-          ? const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-            )
-          : const Icon(Icons.save),
+        icon: _isLoading
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : const Icon(Icons.save),
         label: Text(
           _isLoading ? 'Salvando...' : 'Salvar Alterações',
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
@@ -526,25 +547,30 @@ class _EditHealthDataScreenState extends State<EditHealthDataScreen> {
         updatedHealthData = widget.healthData.copyWith(
           valorSistolica: double.parse(_valorSistolicaController.text),
           valorDiastolica: double.parse(_valorDiastolicaController.text),
-          observacao: _observacaoController.text.trim().isEmpty 
-            ? null 
-            : _observacaoController.text.trim(),
+          observacao: _observacaoController.text.trim().isEmpty
+              ? null
+              : _observacaoController.text.trim(),
           dataRegistro: dataRegistro.toIso8601String(),
         );
       } else {
         updatedHealthData = widget.healthData.copyWith(
           valor: double.parse(_valorController.text),
-          observacao: _observacaoController.text.trim().isEmpty 
-            ? null 
-            : _observacaoController.text.trim(),
+          observacao: _observacaoController.text.trim().isEmpty
+              ? null
+              : _observacaoController.text.trim(),
           dataRegistro: dataRegistro.toIso8601String(),
         );
       }
 
-      final success = await healthDataController.updateHealthData(updatedHealthData);
+      final success = await healthDataController.updateHealthData(
+        updatedHealthData,
+      );
 
       if (success) {
-        ToastService.showSuccess(context, 'Dados de saúde atualizados com sucesso');
+        ToastService.showSuccess(
+          context,
+          'Dados de saúde atualizados com sucesso',
+        );
         Get.back();
       } else {
         ToastService.showError(context, 'Erro ao atualizar dados de saúde');

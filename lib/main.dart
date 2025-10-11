@@ -10,9 +10,13 @@ import 'package:app_remedio/controllers/medication_controller.dart';
 import 'package:app_remedio/controllers/schedules_controller.dart';
 import 'package:app_remedio/controllers/profile_controller.dart';
 import 'package:app_remedio/controllers/health_data_controller.dart';
+import 'package:app_remedio/controllers/settings_controller.dart';
+import 'package:app_remedio/controllers/notification_controller.dart';
 import 'package:app_remedio/utils/constants.dart';
 import 'package:app_remedio/views/onboarding_screen.dart';
-void main() {
+import 'package:app_remedio/utils/notification_service.dart';
+
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   // Configurações da barra de status
@@ -20,15 +24,18 @@ void main() {
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.dark,
   ));
-  
-  // Inicializa os controllers globais
-  // IMPORTANTE: GlobalStateController deve ser inicializado PRIMEIRO
+
   Get.put(GlobalStateController());
   Get.put(ThemeController());
   Get.put(ProfileController());
+  Get.put(NotificationController());
+
+  await NotificationService().init();
+
   Get.put(MedicationController());
   Get.put(SchedulesController());
   Get.put(HealthDataController());
+  Get.put(SettingsController());
   
   runApp(const MeAlerteApp());
 }

@@ -20,7 +20,7 @@ class _AddHealthDataScreenState extends State<AddHealthDataScreen> {
   final _valorSistolicaController = TextEditingController();
   final _valorDiastolicaController = TextEditingController();
   final _observacaoController = TextEditingController();
-  
+
   HealthDataType? _selectedType;
   DateTime _selectedDate = DateTime.now();
   TimeOfDay _selectedTime = TimeOfDay.now();
@@ -68,17 +68,17 @@ class _AddHealthDataScreenState extends State<AddHealthDataScreen> {
             children: [
               _buildTypeSelector(),
               const SizedBox(height: 24),
-              
+
               if (_selectedType != null) ...[
                 _buildValueInputs(),
                 const SizedBox(height: 24),
-                
+
                 _buildDateTimeSelector(),
                 const SizedBox(height: 24),
-                
+
                 _buildObservationField(),
                 const SizedBox(height: 32),
-                
+
                 _buildSaveButton(),
               ],
             ],
@@ -121,10 +121,7 @@ class _AddHealthDataScreenState extends State<AddHealthDataScreen> {
               prefixIcon: Icon(Icons.category, color: primaryColor),
             ),
             items: HealthDataType.values.map((type) {
-              return DropdownMenuItem(
-                value: type,
-                child: Text(type.label),
-              );
+              return DropdownMenuItem(value: type, child: Text(type.label));
             }).toList(),
             onChanged: (HealthDataType? value) {
               setState(() {
@@ -202,7 +199,10 @@ class _AddHealthDataScreenState extends State<AddHealthDataScreen> {
                     decoration: defaultInputDecoration.copyWith(
                       labelText: 'Diastólica',
                       hintText: '80',
-                      prefixIcon: Icon(Icons.favorite_border, color: primaryColor),
+                      prefixIcon: Icon(
+                        Icons.favorite_border,
+                        color: primaryColor,
+                      ),
                     ),
                     keyboardType: TextInputType.number,
                     validator: (value) {
@@ -221,10 +221,7 @@ class _AddHealthDataScreenState extends State<AddHealthDataScreen> {
             const SizedBox(height: 8),
             Text(
               'Unidade: ${_selectedType!.unidade}',
-              style: TextStyle(
-                fontSize: 12,
-                color: textColor.withOpacity(0.6),
-              ),
+              style: TextStyle(fontSize: 12, color: textColor.withOpacity(0.6)),
             ),
           ],
         ),
@@ -260,7 +257,10 @@ class _AddHealthDataScreenState extends State<AddHealthDataScreen> {
               decoration: defaultInputDecoration.copyWith(
                 labelText: _selectedType!.label,
                 hintText: 'Digite o valor',
-                prefixIcon: Icon(_getIconForType(_selectedType!), color: primaryColor),
+                prefixIcon: Icon(
+                  _getIconForType(_selectedType!),
+                  color: primaryColor,
+                ),
                 suffixText: _selectedType!.unidade,
               ),
               keyboardType: TextInputType.number,
@@ -283,7 +283,7 @@ class _AddHealthDataScreenState extends State<AddHealthDataScreen> {
   Widget _buildDateTimeSelector() {
     final dateFormat = DateFormat('dd/MM/yyyy');
     final timeFormat = DateFormat('HH:mm');
-    
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -315,20 +315,26 @@ class _AddHealthDataScreenState extends State<AddHealthDataScreen> {
                 child: InkWell(
                   onTap: _selectDate,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 16,
+                      horizontal: 12,
+                    ),
                     decoration: BoxDecoration(
                       border: Border.all(color: Colors.grey.withOpacity(0.3)),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.calendar_today, color: primaryColor, size: 20),
+                        Icon(
+                          Icons.calendar_today,
+                          color: primaryColor,
+                          size: 20,
+                        ),
                         const SizedBox(width: 12),
-                        Text(
-                          dateFormat.format(_selectedDate),
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: textColor,
+                        Expanded(
+                          child: Text(
+                            dateFormat.format(_selectedDate),
+                            style: TextStyle(fontSize: 16, color: textColor),
                           ),
                         ),
                       ],
@@ -341,7 +347,10 @@ class _AddHealthDataScreenState extends State<AddHealthDataScreen> {
                 child: InkWell(
                   onTap: _selectTime,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 16,
+                      horizontal: 12,
+                    ),
                     decoration: BoxDecoration(
                       border: Border.all(color: Colors.grey.withOpacity(0.3)),
                       borderRadius: BorderRadius.circular(8),
@@ -350,11 +359,18 @@ class _AddHealthDataScreenState extends State<AddHealthDataScreen> {
                       children: [
                         Icon(Icons.access_time, color: primaryColor, size: 20),
                         const SizedBox(width: 12),
-                        Text(
-                          timeFormat.format(DateTime(2023, 1, 1, _selectedTime.hour, _selectedTime.minute)),
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: textColor,
+                        Expanded(
+                          child: Text(
+                            timeFormat.format(
+                              DateTime(
+                                2023,
+                                1,
+                                1,
+                                _selectedTime.hour,
+                                _selectedTime.minute,
+                              ),
+                            ),
+                            style: TextStyle(fontSize: 16, color: textColor),
                           ),
                         ),
                       ],
@@ -415,13 +431,16 @@ class _AddHealthDataScreenState extends State<AddHealthDataScreen> {
       width: double.infinity,
       child: ElevatedButton.icon(
         onPressed: _isLoading ? null : _saveHealthData,
-        icon: _isLoading 
-          ? const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-            )
-          : const Icon(Icons.save),
+        icon: _isLoading
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : const Icon(Icons.save),
         label: Text(
           _isLoading ? 'Salvando...' : 'Salvar Dados',
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
@@ -518,9 +537,9 @@ class _AddHealthDataScreenState extends State<AddHealthDataScreen> {
           valorSistolica: double.parse(_valorSistolicaController.text),
           valorDiastolica: double.parse(_valorDiastolicaController.text),
           unidade: _selectedType!.unidade,
-          observacao: _observacaoController.text.trim().isEmpty 
-            ? null 
-            : _observacaoController.text.trim(),
+          observacao: _observacaoController.text.trim().isEmpty
+              ? null
+              : _observacaoController.text.trim(),
           dataRegistro: dataRegistro.toIso8601String(),
         );
       } else {
@@ -529,9 +548,9 @@ class _AddHealthDataScreenState extends State<AddHealthDataScreen> {
           tipo: _selectedType!.name,
           valor: double.parse(_valorController.text),
           unidade: _selectedType!.unidade,
-          observacao: _observacaoController.text.trim().isEmpty 
-            ? null 
-            : _observacaoController.text.trim(),
+          observacao: _observacaoController.text.trim().isEmpty
+              ? null
+              : _observacaoController.text.trim(),
           dataRegistro: dataRegistro.toIso8601String(),
         );
       }

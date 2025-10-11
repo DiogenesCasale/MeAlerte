@@ -9,6 +9,7 @@ import 'package:app_remedio/views/settings_screen.dart';
 import 'package:app_remedio/views/health_data/health_data_list_screen.dart';
 import 'package:app_remedio/utils/toast_service.dart';
 import 'package:app_remedio/views/medication/stock_history_screen.dart';
+import 'package:app_remedio/views/annotation/annotation_list_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   final bool showBackButton;
@@ -309,16 +310,17 @@ class ProfileScreen extends StatelessWidget {
             icon: Icons.favorite_outline,
             title: 'Dados de Saúde',
             subtitle: 'Registrar peso, pressão, glicose e outros dados',
-            onTap: () => Get.to(() => const HealthDataListScreen()),
+            onTap: () => Get.to(() => const HealthDataDashboardScreen()),
           ),
           _buildDivider(),
-          _buildSettingsTile(
-            icon: Icons.calendar_today,
-            title: 'Consultas',
-            subtitle: 'Agendar e acompanhar consultas médicas',
-            onTap: () => _showFeatureInDevelopment('Consultas', context),
-          ),
-          _buildDivider(),
+          // Ideia de ter consultas foi deixada de lado por enquanto
+          // _buildSettingsTile(
+          //   icon: Icons.calendar_today,
+          //   title: 'Consultas',
+          //   subtitle: 'Agendar e acompanhar consultas médicas',
+          //   onTap: () => _showFeatureInDevelopment('Consultas', context),
+          // ),
+          // _buildDivider(),
           _buildSettingsTile(
             icon: Icons.analytics,
             title: 'Relatórios',
@@ -328,16 +330,16 @@ class ProfileScreen extends StatelessWidget {
           _buildDivider(),
           _buildSettingsTile(
             icon: Icons.inventory,
-            title: 'Reposições',
-            subtitle: 'Controle de reposição de medicamentos',
-            onTap: () => Get.to(() => const StockHistoryScreen()), // Temporário
+            title: 'Histórico',
+            subtitle: 'Histórico de reposição e uso de medicamentos',
+            onTap: () => Get.to(() => const StockHistoryScreen()),
           ),
           _buildDivider(),
           _buildSettingsTile(
             icon: Icons.book,
             title: 'Diário',
             subtitle: 'Observações pessoais e anotações',
-            onTap: () => _showFeatureInDevelopment('Diário', context),
+            onTap: () => Get.to(() => const AnnotationsListScreen()),
           ),
         ],
       ),

@@ -152,14 +152,13 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
               style: TextStyle(color: textColor.withOpacity(0.6)),
             ),
           ),
-          // TODO: Implementar a edição de um horário específico
-          // TextButton(
-          //   onPressed: () => _confirmEditSingle(),
-          //   child: Text(
-          //     'Apenas este horário',
-          //     style: TextStyle(color: Colors.orange),
-          //   ),
-          // ),
+          TextButton(
+            onPressed: () => _confirmEditSingle(),
+            child: Text(
+              'Apenas este horário',
+              style: TextStyle(color: Colors.orange),
+            ),
+          ),
           TextButton(
             onPressed: () => _confirmEditAll(),
             child: Text(
@@ -199,7 +198,7 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
                   newObservacao: _observacaoController.text.trim().isEmpty
                       ? null
                       : _observacaoController.text.trim(),
-                  newTime: DateTime(
+                  newDateTime: DateTime(
                     widget.dose.scheduledTime.year,
                     widget.dose.scheduledTime.month,
                     widget.dose.scheduledTime.day,
@@ -391,8 +390,8 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
                   if (v == null || v.trim().isEmpty)
                     return 'Intervalo é obrigatório';
                   final interval = int.tryParse(v);
-                  if (interval == null || interval <= 0)
-                    return 'Intervalo deve ser > 0';
+                  if (interval == null)
+                    return 'Intervalo deve ser um número válido';
                   return null;
                 },
               ),

@@ -6,10 +6,14 @@ import 'package:app_remedio/models/medication_model.dart';
 import 'package:app_remedio/models/scheduled_medication_model.dart';
 import 'package:app_remedio/models/taken_dose_model.dart';
 import 'package:app_remedio/controllers/profile_controller.dart';
+import 'package:app_remedio/utils/notification_service.dart';
+import 'package:app_remedio/controllers/notification_controller.dart';
+import 'package:app_remedio/controllers/settings_controller.dart';
 
 class SchedulesController extends GetxController {
   // Instância do controlador de banco de dados
   final _dbController = DatabaseController.instance;
+  final _notificationService = NotificationService();
 
   // Observables para o estado da UI
   var groupedDoses = <String, List<TodayDose>>{}.obs;
@@ -65,13 +69,12 @@ class SchedulesController extends GetxController {
 
   Future<void> _initializeData() async {
     try {
+      backfillMissedNotifications();
       await fetchSchedulesForSelectedDate();
     } catch (e) {
       print('Erro ao inicializar dados: $e');
     }
   }
-
-  // --- MÉTODOS DE CONTROLE DA UI ---
 
   /// Recarrega os agendamentos (útil quando o perfil muda)
   Future<void> reloadSchedules() async {
@@ -89,6 +92,7 @@ class SchedulesController extends GetxController {
     final db = await _dbController.database;
     await db.insert('tblMedicamentosAgendados', scheduledMedication.toMap());
     await fetchSchedulesForSelectedDate();
+    rescheduleAllNotifications();
   }
 
   /// Marca uma dose como tomada
@@ -107,17 +111,22 @@ class SchedulesController extends GetxController {
 
     final takenId = await db.insert('tblDosesTomadas', takenDose.toMap());
 
-
     // Reduz o estoque do medicamento
     try {
       final medicationController = Get.find<MedicationController>();
-      await medicationController.reduceStock(dose.idMedicamento, dose.dose, takenId);
+      await medicationController.reduceStock(
+        dose.idMedicamento,
+        dose.dose,
+        takenId,
+      );
     } catch (e) {
       print('Erro ao reduzir estoque: $e');
       // Continua mesmo se houver erro na redução do estoque
     }
 
     await fetchSchedulesForSelectedDate();
+
+    await _notificationService.cancelMedicationNotifications(dose);
   }
 
   /// Desmarca uma dose como tomada (remove do registro)
@@ -143,7 +152,11 @@ class SchedulesController extends GetxController {
       // Restaura o estoque do medicamento
       try {
         final medicationController = Get.find<MedicationController>();
-        await medicationController.restoreStock(medicationId, dose, takenDoseId);
+        await medicationController.restoreStock(
+          medicationId,
+          dose,
+          takenDoseId,
+        );
       } catch (e) {
         print('Erro ao restaurar estoque: $e');
         // Continua mesmo se houver erro na restauração do estoque
@@ -213,6 +226,7 @@ class SchedulesController extends GetxController {
       whereArgs: [scheduledMedication.id],
     );
     await fetchSchedulesForSelectedDate();
+    rescheduleAllNotifications();
   }
 
   Future<void> deleteScheduled(int id) async {
@@ -224,6 +238,7 @@ class SchedulesController extends GetxController {
       whereArgs: [id],
     );
     await fetchSchedulesForSelectedDate(); // Atualiza para a data selecionada
+    rescheduleAllNotifications();
   }
 
   Future<List<ScheduledMedication>> getAllScheduledFromDB() async {
@@ -427,7 +442,7 @@ class SchedulesController extends GetxController {
       }
 
       // --- MUDANÇA PRINCIPAL AQUI ---
-      
+
       // 1. Pega as chaves de horário (ex: "08:00") e ordena com uma lógica customizada
       final sortedKeys = generatedDoses.keys.toList();
 
@@ -436,10 +451,12 @@ class SchedulesController extends GetxController {
         final dosesB = generatedDoses[keyB]!;
 
         // Um grupo é considerado "concluído" se TODAS as suas doses foram tomadas
-        final bool isGroupADone =
-            dosesA.every((d) => d.status == MedicationStatus.taken);
-        final bool isGroupBDone =
-            dosesB.every((d) => d.status == MedicationStatus.taken);
+        final bool isGroupADone = dosesA.every(
+          (d) => d.status == MedicationStatus.taken,
+        );
+        final bool isGroupBDone = dosesB.every(
+          (d) => d.status == MedicationStatus.taken,
+        );
 
         // Critério primário: move os grupos concluídos para o final
         if (isGroupADone && !isGroupBDone) {
@@ -452,7 +469,7 @@ class SchedulesController extends GetxController {
         // Critério secundário: se o status for o mesmo, ordena por horário
         return keyA.compareTo(keyB);
       });
-      
+
       final sortedMap = <String, List<TodayDose>>{};
 
       // 2. Itera sobre os horários já na ordem correta
@@ -478,7 +495,6 @@ class SchedulesController extends GetxController {
       }
 
       groupedDoses.value = sortedMap;
-
     } finally {
       isLoading(false);
     }
@@ -542,13 +558,12 @@ class SchedulesController extends GetxController {
 
   /// Atualiza uma dose específica (dose, observação, etc.)
   Future<void> updateSpecificDose(
-    TodayDose dose, {
-    double? newDose,
-    String? newObservacao,
-    DateTime? newTime,
+    TodayDose originalDose, {
+    required double newDose,
+    required String? newObservacao,
+    required DateTime newDateTime,
   }) async {
     final db = await _dbController.database;
-
     final profileController = Get.find<ProfileController>();
     final currentProfile = profileController.currentProfile.value;
 
@@ -556,30 +571,37 @@ class SchedulesController extends GetxController {
       throw Exception('Nenhum perfil selecionado');
     }
 
-    final dateStr = DateFormat('yyyy-MM-dd').format(dose.scheduledTime);
-    final originalTimeStr = DateFormat('HH:mm').format(dose.scheduledTime);
-    final newTimeStr = newTime != null
-        ? DateFormat('HH:mm').format(newTime)
-        : originalTimeStr;
+    // --- PASSO A: Marcar a dose original como excluída para este dia ---
+    // Esta parte já funciona e está correta.
+    await deleteSpecificDose(
+      originalDose.scheduledMedicationId,
+      originalDose.scheduledTime,
+    );
 
-    // Primeiro, marcar a dose original como "excluída" para este dia específico
-    await deleteSpecificDose(dose.scheduledMedicationId, dose.scheduledTime);
+    // --- PASSO B: Criar um novo agendamento que representa a exceção ---
+    final newScheduleForException = ScheduledMedication(
+      idPerfil: originalDose.idPerfil,
+      idMedicamento: originalDose.idMedicamento,
+      // A hora do novo agendamento é a hora editada
+      hora: DateFormat('HH:mm').format(newDateTime),
+      dose: newDose,
+      // Intervalo 0 para não repetir
+      intervalo: 0,
+      // Data de início e fim no mesmo dia da exceção
+      dataInicio: DateFormat('yyyy-MM-dd').format(newDateTime),
+      dataFim: DateFormat('yyyy-MM-dd').format(newDateTime),
+      paraSempre: false,
+      observacao: newObservacao,
+      idAgendamentoPai: originalDose.scheduledMedicationId,
+    );
 
-    // Depois, criar um registro de dose "tomada" com os novos valores
-    // Isso substitui efetivamente a dose original para este dia específico
-    await db.insert('tblDosesTomadas', {
-      'idAgendamento': dose.scheduledMedicationId,
-      'dataTomada': dateStr,
-      'horarioTomada': newTimeStr,
-      'horarioAgendado': originalTimeStr,
-      'idPerfil': currentProfile!.id,
-      'observacao':
-          'DOSE_EDITADA: ${newDose ?? dose.dose} - ${newObservacao ?? dose.observacao ?? ''}',
-      'deletado': 0, // Esta é uma dose "real" editada
-      'dataCriacao': DateTime.now().toIso8601String(),
-      'dataAtualizacao': DateTime.now().toIso8601String(),
-    });
+    // Insere o novo agendamento de exceção no banco
+    await db.insert(
+      'tblMedicamentosAgendados',
+      newScheduleForException.toMap(),
+    );
 
+    // Atualiza a UI para refletir as mudanças
     await fetchSchedulesForSelectedDate();
   }
 
@@ -603,5 +625,168 @@ class SchedulesController extends GetxController {
       return ScheduledMedication.fromMapWithMedication(result.first);
     }
     return null;
+  }
+
+  /// Cancela TODAS as notificações pendentes e reagenda tudo com base no banco de dados.
+  /// Esta é a fonte da verdade para as notificações.
+  Future<void> rescheduleAllNotifications() async {
+    print('🔄 Iniciando reagendamento global de notificações...');
+
+    // 1. Cancela absolutamente todas as notificações agendadas para começar do zero.
+    await _notificationService.cancelAllNotifications();
+
+    // 2. Busca todos os agendamentos ativos no banco de dados.
+    final allSchedules = await getAllScheduledFromDB();
+    final now = DateTime.now();
+
+    // 3. Itera sobre cada agendamento para calcular e agendar suas doses futuras.
+    for (var schedule in allSchedules) {
+      // Define um limite para não agendar notificações para sempre (ex: próximos 30 dias)
+      final scheduleLimit = now.add(const Duration(days: 30));
+
+      // Validações de data (essencial para evitar bugs)
+      if (schedule.dataInicio == null) continue;
+      final startDate = DateTime.parse(schedule.dataInicio!);
+      final endDate = schedule.paraSempre || schedule.dataFim == null
+          ? null
+          : DateTime.parse(schedule.dataFim!);
+
+      // Calcula a hora da primeira dose do agendamento
+      final timeParts = schedule.hora.split(':');
+      DateTime nextDoseTime = DateTime(
+        startDate.year,
+        startDate.month,
+        startDate.day,
+        int.parse(timeParts[0]),
+        int.parse(timeParts[1]),
+      );
+
+      // Avança a `nextDoseTime` para a primeira ocorrência a partir de AGORA
+      while (nextDoseTime.isBefore(now)) {
+        if (schedule.intervalo <= 0) break; // Evita loop infinito
+        nextDoseTime = nextDoseTime.add(Duration(hours: schedule.intervalo));
+      }
+
+      // 4. Agenda as doses futuras até o limite definido
+      while (nextDoseTime.isBefore(scheduleLimit)) {
+        // Verifica se a dose está dentro do período de tratamento
+        if (endDate != null && nextDoseTime.isAfter(endDate)) {
+          break; // Interrompe se já passou da data final do tratamento
+        }
+
+        // Cria um objeto `TodayDose` para o serviço de notificação
+        final futureDose = TodayDose(
+          scheduledMedicationId: schedule.id!,
+          idMedicamento: schedule.idMedicamento,
+          medicationName: schedule.medicationName!,
+          dose: schedule.dose,
+          scheduledTime: nextDoseTime,
+          idPerfil: schedule.idPerfil,
+          // O resto dos campos não são essenciais para agendar a notificação
+        );
+
+        // Agenda a notificação para esta dose futura
+        await _notificationService.scheduleMedicationNotifications(futureDose);
+
+        if (schedule.intervalo <= 0) break; // Evita loop infinito
+        nextDoseTime = nextDoseTime.add(Duration(hours: schedule.intervalo));
+      }
+    }
+    print('✅ Reagendamento global de notificações concluído.');
+  }
+
+  /// Verifica e salva no banco notificações que foram exibidas mas não tocadas pelo usuário.
+  Future<void> backfillMissedNotifications() async {
+    print('🔄 Verificando notificações perdidas (backfill)...');
+    try {
+      final db = await _dbController.database;
+      final notificationController = Get.find<NotificationController>();
+
+      // 1. Busca todos os agendamentos ativos
+      final allSchedules = await getAllScheduledFromDB();
+      if (allSchedules.isEmpty) {
+        print('Nenhum agendamento ativo, nenhuma notificação a verificar.');
+        return;
+      }
+
+      // 2. Pega a lista de notificações que JÁ ESTÃO no banco
+      final existingNotifications = await db.query(
+        'tblNotificacoes',
+        where: 'deletado = 0',
+      );
+
+      // 3. Monta um "set" para busca rápida (ex: 'idAgendamento_horarioAgendado')
+      final existingKeys = <String>{};
+      for (var notif in existingNotifications) {
+        existingKeys.add(
+          '${notif['idAgendamento']}_${notif['horarioAgendado']}',
+        );
+      }
+
+      final now = DateTime.now();
+
+      // 4. Itera em cada agendamento para calcular suas doses passadas
+      for (var schedule in allSchedules) {
+        if (schedule.dataInicio == null) continue;
+
+        final startDate = DateTime.parse(schedule.dataInicio!);
+        final timeParts = schedule.hora.split(':');
+        DateTime doseTime = DateTime(
+          startDate.year,
+          startDate.month,
+          startDate.day,
+          int.parse(timeParts[0]),
+          int.parse(timeParts[1]),
+        );
+
+        // Itera sobre os horários das doses desde o início do tratamento ATÉ AGORA
+        while (doseTime.isBefore(now)) {
+          final horarioAgendado = DateFormat('HH:mm').format(doseTime);
+          final key = '${schedule.id}_$horarioAgendado';
+
+          // 5. Se a chave NÃO EXISTE no banco, significa que a notificação foi perdida
+          if (!existingKeys.contains(key)) {
+            print(
+              'INFO: Notificação perdida encontrada para ${schedule.medicationName} às $horarioAgendado. Salvando...',
+            );
+
+            // Cria os dados para o lembrete
+            final settings = Get.find<SettingsController>();
+            final reminderTime = doseTime.subtract(
+              Duration(minutes: settings.timeBefore.value),
+            );
+            if (reminderTime.isBefore(now)) {
+              await notificationController.saveNotificationToDatabase(
+                idAgendamento: schedule.id,
+                horarioAgendado: horarioAgendado,
+                titulo: 'Lembrete de Medicamento',
+                mensagem:
+                    '${settings.reminderText.value} ${schedule.medicationName} às $horarioAgendado.',
+              );
+            }
+
+            // Cria os dados para o alerta de atraso
+            final lateTime = doseTime.add(
+              Duration(minutes: settings.timeAfter.value),
+            );
+            if (lateTime.isBefore(now)) {
+              await notificationController.saveNotificationToDatabase(
+                idAgendamento: schedule.id,
+                horarioAgendado: horarioAgendado,
+                titulo: 'Medicamento Atrasado',
+                mensagem:
+                    'Você já tomou seu ${schedule.medicationName} das $horarioAgendado?',
+              );
+            }
+          }
+
+          if (schedule.intervalo <= 0) break;
+          doseTime = doseTime.add(Duration(hours: schedule.intervalo));
+        }
+      }
+      print('✅ Verificação de notificações perdidas concluída.');
+    } catch (e) {
+      print('❌ Erro durante o backfill de notificações: $e');
+    }
   }
 }

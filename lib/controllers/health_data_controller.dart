@@ -28,6 +28,24 @@ class HealthDataController extends GetxController {
     super.onClose();
   }
 
+  Map<HealthDataType, List<HealthData>> getGroupedData() {
+    final grouped = <HealthDataType, List<HealthData>>{};
+    for (final data in healthDataList) {
+      final type = HealthDataType.fromString(data.tipo);
+      if (type != null) {
+        if (!grouped.containsKey(type)) {
+          grouped[type] = [];
+        }
+        grouped[type]!.add(data);
+      }
+    }
+    // Ordena os dados de cada grupo por data, do mais recente para o mais antigo
+    grouped.forEach((key, value) {
+      value.sort((a, b) => b.dataRegistroDateTime.compareTo(a.dataRegistroDateTime));
+    });
+    return grouped;
+  }
+
   Future<void> _waitForProfileAndInitialize() async {
     try {
       // Aguarda o ProfileController estar disponível

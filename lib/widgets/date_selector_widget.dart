@@ -4,7 +4,6 @@ import 'package:app_remedio/utils/constants.dart';
 import 'package:app_remedio/controllers/theme_controller.dart';
 import 'package:app_remedio/controllers/schedules_controller.dart';
 import 'package:intl/intl.dart';
-// NOVO: Importe o pacote
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 class DateSelectorWidget extends StatefulWidget {

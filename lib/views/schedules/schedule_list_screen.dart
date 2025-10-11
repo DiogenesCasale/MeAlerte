@@ -639,7 +639,7 @@ class ScheduleListScreen extends GetView<SchedulesController> {
         children: [
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(12), // Era 16.0
+            padding: const EdgeInsets.all(8), // Era 16.0
             decoration: BoxDecoration(
               color: primaryColor.withValues(alpha: 0.1),
               borderRadius: const BorderRadius.only(
@@ -650,14 +650,14 @@ class ScheduleListScreen extends GetView<SchedulesController> {
             child: Text(
               time,
               style: TextStyle(
-                fontSize: 16, // Era 18.0
+                fontSize: 18, // Era 18.0
                 fontWeight: FontWeight.bold,
                 color: primaryColor,
               ),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(6.0), // Era 8.0
+            padding: const EdgeInsets.all(3.0), // Era 8.0
             child: Column(
               children: doses
                   .map((dose) => _buildMedicationCard(dose))
@@ -883,6 +883,7 @@ class ScheduleListScreen extends GetView<SchedulesController> {
 
     // Substitui as variáveis na mensagem do perfil
     String shareMessage = customMessageTemplate
+        .replaceAll('{nomePerfil}', freshProfile?.nome ?? 'Usuário')
         .replaceAll('{remedio}', dose.medicationName)
         .replaceAll('{dose}', doseAmount)
         .replaceAll('{hora}', timeFormatted);
@@ -1035,14 +1036,13 @@ class ScheduleListScreen extends GetView<SchedulesController> {
               style: TextStyle(color: textColor.withOpacity(0.6)),
             ),
           ),
-          // TODO: Implementar a exclusão de um horário específico
-          // TextButton(
-          //   onPressed: () => _confirmDeleteSingle(dose),
-          //   child: Text(
-          //     'Apenas este horário',
-          //     style: TextStyle(color: Colors.orange),
-          //   ),
-          // ),
+          TextButton(
+            onPressed: () => _confirmDeleteSingle(dose),
+            child: Text(
+              'Apenas este horário',
+              style: TextStyle(color: Colors.orange),
+            ),
+          ),
           TextButton(
             onPressed: () => _confirmDeleteAll(dose),
             child: Text(

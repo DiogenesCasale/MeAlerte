@@ -31,9 +31,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   String? _imagePath;
   String? _originalImagePath;
   bool? _perfilPadrao;
-  
+
   late Future<Profile?> _loadProfileFuture;
-  bool _fieldsInitialized = false; // ✅ CORREÇÃO: Flag para controlar a inicialização
+  bool _fieldsInitialized =
+      false; // ✅ CORREÇÃO: Flag para controlar a inicialização
 
   final List<String> _generos = ['Masculino', 'Feminino', 'Outro'];
 
@@ -56,7 +57,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (mensagemCompartilhar.isEmpty) {
       mensagemCompartilhar = defaultMessageTemplate;
     }
-    _mensagemCompartilharController = TextEditingController(text: mensagemCompartilhar);
+    _mensagemCompartilharController = TextEditingController(
+      text: mensagemCompartilhar,
+    );
     _selectedGenero = profile.genero;
     _imagePath = profile.caminhoImagem;
     _originalImagePath = profile.caminhoImagem;
@@ -116,7 +119,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           }
 
           final profile = snapshot.data!;
-          
+
           // ✅ CORREÇÃO: Inicializa os campos APENAS UMA VEZ
           if (!_fieldsInitialized) {
             _initializeFields(profile);
@@ -154,8 +157,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (pickedFile != null) {
       final appDir = await getApplicationDocumentsDirectory();
       final fileName = p.basename(pickedFile.path);
-      final savedImage = await File(pickedFile.path).copy('${appDir.path}/$fileName');
-      
+      final savedImage = await File(
+        pickedFile.path,
+      ).copy('${appDir.path}/$fileName');
+
       if (mounted) {
         setState(() {
           _imagePath = savedImage.path;
@@ -173,7 +178,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           children: <Widget>[
             ListTile(
               leading: Icon(Icons.photo_library, color: textColor),
-              title: Text('Galeria de Fotos', style: TextStyle(color: textColor)),
+              title: Text(
+                'Galeria de Fotos',
+                style: TextStyle(color: textColor),
+              ),
               onTap: () {
                 _pickImage(ImageSource.gallery);
                 Navigator.of(context).pop();
@@ -190,7 +198,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             if (_imagePath != null)
               ListTile(
                 leading: Icon(Icons.delete, color: Colors.red),
-                title: Text('Remover Foto', style: TextStyle(color: Colors.red)),
+                title: Text(
+                  'Remover Foto',
+                  style: TextStyle(color: Colors.red),
+                ),
                 onTap: () {
                   setState(() {
                     _imagePath = null;
@@ -220,6 +231,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Nome
         WidgetsDefault.buildTextField(
           controller: _nomeController,
           label: 'Nome *',
@@ -227,24 +239,65 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           keyboardType: TextInputType.text,
           validator: (v) {
             if (v == null || v.trim().isEmpty) return 'Nome é obrigatório';
-            if (v.trim().length < 2) return 'Nome deve ter pelo menos 2 caracteres';
+            if (v.trim().length < 2)
+              return 'Nome deve ter pelo menos 2 caracteres';
             return null;
           },
         ),
-        const SizedBox(height: 20),
-        WidgetsDefault.buildDateField(
-          label: 'Data de Nascimento',
-          value: _dataNascimento,
-          onTap: _selectDate,
-          isRequired: false,
-          validator: (value) {
-            if (value != null && value.isAfter(DateTime.now())) {
-              return 'Data não pode ser no futuro';
-            }
-            return null;
-          },
+
+        const SizedBox(height: 10),
+
+        // Linha com Data de Nascimento e Perfil Padrão
+        Row(
+          crossAxisAlignment:
+              CrossAxisAlignment.end, // Alinha os itens pela base
+          children: [
+            // Coluna da Data de Nascimento
+            Expanded(
+              flex: 2, // Ocupa 2/3 do espaço
+              child: WidgetsDefault.buildDateField(
+                label: 'Data de Nascimento',
+                value: _dataNascimento,
+                onTap: _selectDate,
+                isRequired: false,
+                validator: (value) {
+                  if (value != null && value.isAfter(DateTime.now())) {
+                    return 'Data não pode ser no futuro';
+                  }
+                  return null;
+                },
+              ),
+            ),
+
+            const SizedBox(width: 10),
+
+            // Coluna do Perfil Padrão
+            Expanded(
+              flex: 1, // Ocupa 1/3 do espaço
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Padrão', style: heading2Style),
+                  const SizedBox(height: 4),
+                  Switch(
+                    value:
+                        _perfilPadrao ??
+                        false, // Mantém o ?? false por segurança
+                    onChanged: (value) {
+                      setState(() {
+                        _perfilPadrao = value;
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 20),
+
+        const SizedBox(height: 10),
+
+        // Gênero
         Text('Gênero', style: heading2Style),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
@@ -260,7 +313,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12.0),
-              borderSide: BorderSide(color: textColor.withOpacity(0.3)),
+              borderSide: BorderSide(color: textColor.withValues(alpha: 0.3)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12.0),
@@ -270,10 +323,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               borderRadius: BorderRadius.circular(12.0),
               borderSide: BorderSide(color: secondaryColor, width: 2),
             ),
-            hint: Text(
-              'Selecione o gênero',
-              style: TextStyle(color: textColor.withOpacity(0.5)),
-            ),
+          ),
+          hint: Text(
+            'Selecione o gênero',
+            style: TextStyle(color: textColor.withValues(alpha: 0.5)),
           ),
           items: _generos.map((genero) {
             return DropdownMenuItem(
@@ -287,23 +340,50 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             });
           },
         ),
-        const SizedBox(height: 20),
+
+        const SizedBox(height: 10),
+
+        // Mensagem de Compartilhamento
         WidgetsDefault.buildTextField(
           controller: _mensagemCompartilharController,
           label: 'Mensagem de Compartilhamento',
           hint: 'Ex: Olá, segue abaixo o lembrete de medicamento',
+          maxLines: 3,
         ),
-        const SizedBox(height: 10),
-        SwitchListTile(
-          title: Text('Perfil Padrão', style: heading2Style),
-          value: _perfilPadrao ?? false,
-          onChanged: (value) {
-            setState(() {
-              _perfilPadrao = value;
-            });
-          },
+
+        const SizedBox(height: 8),
+
+        // Botões das variáveis
+        Wrap(
+          spacing: 8.0,
+          runSpacing: 4.0,
+          children: variaveis.map((variavel) {
+            return ActionChip(
+              label: Text(variavel),
+              onPressed: () => _inserirVariavel(variavel),
+              backgroundColor: surfaceColor,
+              labelStyle: TextStyle(color: textColor, fontSize: 12),
+              side: BorderSide(color: textColor.withOpacity(0.2)),
+            );
+          }).toList(),
         ),
       ],
+    );
+  }
+
+  void _inserirVariavel(String variavel) {
+    final text = _mensagemCompartilharController.text;
+    final textSelection = _mensagemCompartilharController.selection;
+    final newText = text.replaceRange(
+      textSelection.start,
+      textSelection.end,
+      variavel,
+    );
+    final myTextLength = variavel.length;
+    _mensagemCompartilharController.text = newText;
+    _mensagemCompartilharController.selection = textSelection.copyWith(
+      baseOffset: textSelection.start + myTextLength,
+      extentOffset: textSelection.start + myTextLength,
     );
   }
 
@@ -389,7 +469,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _selectDate() async {
-    final initialDate = _dataNascimento ?? DateTime.now().subtract(const Duration(days: 365 * 20));
+    final initialDate =
+        _dataNascimento ??
+        DateTime.now().subtract(const Duration(days: 365 * 20));
 
     final picked = await showDatePicker(
       context: context,
@@ -406,14 +488,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  Future<void> _deleteProfile(ProfileController controller, Profile profile) async {
+  Future<void> _deleteProfile(
+    ProfileController controller,
+    Profile profile,
+  ) async {
     final success = await controller.deleteProfile(profile);
     if (success && mounted) {
       Get.back();
     }
   }
 
-  Future<void> _saveProfile(ProfileController controller, Profile profile) async {
+  Future<void> _saveProfile(
+    ProfileController controller,
+    Profile profile,
+  ) async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
