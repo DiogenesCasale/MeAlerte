@@ -349,6 +349,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           label: 'Mensagem de Compartilhamento',
           hint: 'Ex: Olá, segue abaixo o lembrete de medicamento',
           maxLines: 3,
+          validator: (v) {
+            // <-- ADICIONE ESTA PARTE
+            if (v == null || v.trim().isEmpty) {
+              return 'A mensagem é obrigatória';
+            }
+            return null; // Retorna null se for válido
+          },
         ),
 
         const SizedBox(height: 8),

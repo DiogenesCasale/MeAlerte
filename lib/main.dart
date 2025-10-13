@@ -25,17 +25,18 @@ Future<void> main() async {
     statusBarIconBrightness: Brightness.dark,
   ));
 
+  // NÃO MUDAR A ORDEM DE INICIALIZAÇÃO DOS CONTROLLERS
   Get.put(GlobalStateController());
   Get.put(ThemeController());
   Get.put(ProfileController());
   Get.put(NotificationController());
+  Get.put(SettingsController());
 
   await NotificationService().init();
 
   Get.put(MedicationController());
   Get.put(SchedulesController());
   Get.put(HealthDataController());
-  Get.put(SettingsController());
   
   runApp(const MeAlerteApp());
 }

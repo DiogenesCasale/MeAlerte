@@ -5,6 +5,10 @@ import 'package:app_remedio/utils/constants.dart';
 import 'package:app_remedio/utils/notification_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:app_remedio/controllers/settings_controller.dart';
+import 'package:app_remedio/utils/toast_service.dart';
+import 'dart:io'; // Para verificar a plataforma (Platform.isAndroid)
+import 'package:jbh_ringtone/jbh_ringtone.dart';
+import 'package:app_remedio/views/sound_selection_screen.dart';
 
 // <-- MUDANÇA 2: Converter para StatefulWidget
 class SettingsScreen extends StatefulWidget {
@@ -163,133 +167,182 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildNotificationsCard() {
-    return Container(
-      decoration: BoxDecoration(
-        color: surfaceColor,
-        borderRadius: BorderRadius.circular(12),
-        // ... sua sombra
-      ),
-      child: Obx(
-        () => Column(
-          // Usa Obx para reatividade
+  Widget _buildSettingsRow({
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    required Widget
+    trailing, // Agora o widget final (Switch, Dropdown) é obrigatório
+    VoidCallback? onTap,
+  }) {
+    // Usamos um InkWell e Row para ter controle total do layout e do toque
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        // Padding interno para cada linha, criando um respiro
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+        child: Row(
           children: [
-            SwitchListTile(
-              title: const Text('Habilitar Notificações'),
-              value: settingsController.notificationsEnabled.value,
-              onChanged: settingsController.setNotificationsEnabled,
-              secondary: Icon(Icons.notifications_active, color: primaryColor),
+            Icon(icon, color: primaryColor, size: 24),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: textColor,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: textColor.withOpacity(0.6),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ],
+              ),
             ),
-            if (settingsController.notificationsEnabled.value) ...[
-              const Divider(height: 1, indent: 16, endIndent: 16),
-              SwitchListTile(
-                title: const Text('Vibrar'),
-                value: settingsController.vibrateEnabled.value,
-                onChanged: settingsController.setVibrate,
-                secondary: Icon(Icons.vibration, color: primaryColor),
-              ),
-              const Divider(height: 1, indent: 16, endIndent: 16),
-              ListTile(
-                leading: Icon(Icons.music_note, color: primaryColor),
-                title: const Text('Som da Notificação'),
-                trailing: DropdownButton<String>(
-                  value: settingsController.sound.value,
-                  items: const [
-                    DropdownMenuItem(value: 'default', child: Text('Padrão')),
-                    DropdownMenuItem(value: 'none', child: Text('Nenhum')),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      settingsController.setSound(value);
-                    }
-                  },
-                ),
-              ),
-              const Divider(height: 1, indent: 16, endIndent: 16),
-              ListTile(
-                leading: Icon(Icons.alarm, color: primaryColor),
-                title: const Text('Lembrar antes'),
-                trailing: DropdownButton<int>(
-                  value: settingsController.timeBefore.value,
-                  items: const [
-                    DropdownMenuItem(value: 5, child: Text('5 min')),
-                    DropdownMenuItem(value: 10, child: Text('10 min')),
-                    DropdownMenuItem(value: 15, child: Text('15 min')),
-                    DropdownMenuItem(value: 30, child: Text('30 min')),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      settingsController.setTimeBefore(value);
-                    }
-                  },
-                ),
-              ),
-              const Divider(height: 1, indent: 16, endIndent: 16),
-              ListTile(
-                leading: Icon(Icons.history, color: primaryColor),
-                title: const Text('Lembrar após (atraso)'),
-                trailing: DropdownButton<int>(
-                  value: settingsController.timeAfter.value,
-                  items: const [
-                    DropdownMenuItem(value: 15, child: Text('15 min')),
-                    DropdownMenuItem(value: 30, child: Text('30 min')),
-                    DropdownMenuItem(value: 60, child: Text('1 hora')),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      settingsController.setTimeAfter(value);
-                    }
-                  },
-                ),
-              ),
-              const Divider(height: 1, indent: 16, endIndent: 16),
-              ListTile(
-                leading: Icon(Icons.edit, color: primaryColor),
-                title: const Text('Texto do Lembrete'),
-                subtitle: Text(
-                  settingsController.reminderText.value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                onTap: _showReminderTextDialog,
-              ),
-              const Divider(height: 1, indent: 16, endIndent: 16),
-              ListTile(
-                leading: Icon(Icons.notifications_active, color: primaryColor),
-                title: const Text('Testar Notificação'),
-                subtitle: const Text('Enviar uma notificação de teste'),
-                onTap: _testNotification,
-                trailing: Icon(Icons.arrow_forward_ios, size: 16, color: primaryColor),
-              ),
-            ],
+            const SizedBox(width: 8),
+            trailing, // Adiciona o widget final (Switch, Dropdown, etc.)
           ],
         ),
       ),
     );
   }
 
-  // NOVO MÉTODO: Diálogo para editar texto
-  void _showReminderTextDialog() {
-    final textController = TextEditingController(
-      text: settingsController.reminderText.value,
-    );
-    Get.defaultDialog(
-      title: 'Editar Lembrete',
-      content: TextField(
-        controller: textController,
-        autofocus: true,
-        decoration: const InputDecoration(labelText: 'Texto da notificação'),
+  // MÉTODO ANTIGO ATUALIZADO: Substitua o seu _buildNotificationsCard por este
+  Widget _buildNotificationsCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: surfaceColor,
+        borderRadius: BorderRadius.circular(12),
+        // ALTERAÇÃO 1: Adicionando a sombra que faltava para combinar com os outros cards
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(onPressed: () => Get.back(), child: const Text('Cancelar')),
-        ElevatedButton(
-          onPressed: () {
-            settingsController.setReminderText(textController.text);
-            Get.back();
-          },
-          child: const Text('Salvar'),
-        ),
-      ],
+      // O ClipRRect garante que o efeito de toque do InkWell respeite as bordas arredondadas
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Obx(() {
+          // A visibilidade das opções aninhadas agora é controlada aqui
+          final bool areOptionsVisible =
+              settingsController.notificationsEnabled.value;
+
+          return Column(
+            children: [
+              _buildSettingsRow(
+                icon: Icons.notifications, // Ícone mais genérico
+                title: 'Habilitar Notificações',
+                trailing: Switch(
+                  value: settingsController.notificationsEnabled.value,
+                  onChanged: settingsController.setNotificationsEnabled,
+                  activeColor: primaryColor, // Cor do switch ativo
+                ),
+              ),
+
+              // Anima a aparição e desaparecimento das outras opções
+              AnimatedSize(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+                child: Column(
+                  children: [
+                    if (areOptionsVisible) ...[
+                      const Divider(height: 1, indent: 16, endIndent: 16),
+                      _buildSettingsRow(
+                        icon: Icons.vibration,
+                        title: 'Vibrar',
+                        trailing: Switch(
+                          value: settingsController.vibrateEnabled.value,
+                          onChanged: settingsController.setVibrate,
+                          activeColor: primaryColor,
+                        ),
+                      ),
+                      const Divider(height: 1, indent: 16, endIndent: 16),
+                      _buildSettingsRow(
+                        icon: Icons.music_note,
+                        title: 'Som da Notificação',
+                        // Exibe o nome do som salvo no controller
+                        subtitle:
+                            settingsController.notificationSoundTitle.value,
+                        onTap: _pickSound, // Chama o seletor de som ao tocar
+                        trailing: Icon(
+                          Icons.arrow_forward_ios,
+                          size: 16,
+                          color: textColor.withOpacity(0.6),
+                        ),
+                      ),
+                      const Divider(height: 1, indent: 16, endIndent: 16),
+                      _buildSettingsRow(
+                        icon: Icons.alarm,
+                        title: 'Lembrar antes',
+                        trailing: DropdownButton<int>(
+                          value: settingsController.timeBefore.value,
+                          items: const [
+                            DropdownMenuItem(value: 10, child: Text('10 min')),
+                            DropdownMenuItem(value: 15, child: Text('15 min')),
+                            DropdownMenuItem(value: 30, child: Text('30 min')),
+                            DropdownMenuItem(value: 60, child: Text('1 hora')),
+                          ],
+                          onChanged: (v) =>
+                              settingsController.setTimeBefore(v!),
+                          underline: const SizedBox.shrink(),
+                          style: TextStyle(color: textColor, fontSize: 15),
+                          dropdownColor: surfaceColor,
+                        ),
+                      ),
+                      const Divider(height: 1, indent: 16, endIndent: 16),
+                      _buildSettingsRow(
+                        icon: Icons.history,
+                        title: 'Lembrar após (atraso)',
+                        trailing: DropdownButton<int>(
+                          value: settingsController.timeAfter.value,
+                          items: const [
+                            DropdownMenuItem(value: 10, child: Text('10 min')),
+                            DropdownMenuItem(value: 15, child: Text('15 min')),
+                            DropdownMenuItem(value: 30, child: Text('30 min')),
+                            DropdownMenuItem(value: 60, child: Text('1 hora')),
+                          ],
+                          onChanged: (v) => settingsController.setTimeAfter(v!),
+                          underline: const SizedBox.shrink(),
+                          style: TextStyle(color: textColor, fontSize: 15),
+                          dropdownColor: surfaceColor,
+                        ),
+                      ),
+                      const Divider(height: 1, indent: 16, endIndent: 16),
+                      _buildSettingsRow(
+                        icon: Icons.send_to_mobile,
+                        title: 'Testar Notificação',
+                        subtitle: 'Enviar uma notificação de teste',
+                        onTap: _testNotification,
+                        trailing: Icon(
+                          Icons.arrow_forward_ios,
+                          size: 16,
+                          color: textColor.withOpacity(0.6),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          );
+        }),
+      ),
     );
   }
 
@@ -298,23 +351,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final notificationService = NotificationService();
       await notificationService.testNotification();
-      
-      Get.snackbar(
-        'Teste de Notificação',
+
+      ToastService.showSuccess(
+        context,
         'Notificação de teste enviada! Verifique se ela apareceu.',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-        duration: const Duration(seconds: 3),
       );
     } catch (e) {
-      Get.snackbar(
-        'Erro',
+      ToastService.showError(
+        context,
         'Erro ao enviar notificação de teste: $e',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-        duration: const Duration(seconds: 3),
       );
     }
   }
@@ -372,6 +417,66 @@ class _SettingsScreenState extends State<SettingsScreen> {
               : null),
       onTap: onTap,
     );
+  }
+
+  Future<void> _pickSound() async {
+    // Para Android, abrimos nossa tela de seleção personalizada
+    if (Platform.isAndroid) {
+      // Paramos qualquer som que possa estar tocando antes de navegar
+      JbhRingtone().stopRingtone();
+
+      // Navega para a tela de seleção e aguarda um resultado
+      final result = await Get.to<JbhRingtoneModel>(
+        () => SoundSelectionScreen(
+          // Passa a URI atual para que a tela saiba qual som está selecionado
+          currentSoundUri: settingsController.notificationSoundUri.value,
+        ),
+      );
+
+      // 'result' será o JbhRingtoneModel selecionado ou null se o usuário voltou sem escolher
+      if (result != null) {
+        print('🔔 Som selecionado: ${result.title}, URI: ${result.uri}');
+        // Atualiza o som no seu controller com a URI e o TÍTULO real do som!
+        settingsController.setNotificationSound(
+          result.uri.toString(),
+          result.title,
+        );
+        if (mounted) {
+          ToastService.showSuccess(context, 'Som de notificação atualizado!');
+        }
+      } else {
+        print('🔔 Seleção de som cancelada.');
+      }
+    } else if (Platform.isIOS) {
+      // A lógica para iOS (que não tem seletor) continua a mesma
+      // Você pode manter o diálogo que já tinha
+      Get.dialog(
+        AlertDialog(
+          backgroundColor: surfaceColor,
+          title: Text('Som da Notificação', style: heading2Style),
+          content: Text(
+            'No iOS, você pode usar o som padrão do aplicativo ou desativar o som para esta notificação.',
+            style: bodyTextStyle,
+          ),
+          actions: [
+            TextButton(
+              child: Text('Padrão', style: TextStyle(color: primaryColor)),
+              onPressed: () {
+                settingsController.setNotificationSound(null, 'Padrão');
+                Get.back();
+              },
+            ),
+            TextButton(
+              child: Text('Silencioso', style: TextStyle(color: textColor)),
+              onPressed: () {
+                settingsController.setNotificationSound('silent', 'Silencioso');
+                Get.back();
+              },
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   Widget _buildThemeOption(

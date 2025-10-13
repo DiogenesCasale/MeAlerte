@@ -125,8 +125,13 @@ class SchedulesController extends GetxController {
     }
 
     await fetchSchedulesForSelectedDate();
+    rescheduleNotificationsTaken(dose);
+  }
 
-    await _notificationService.cancelMedicationNotifications(dose);
+  // Metodo auxiliar para reagendar e cancelar notificações quando for marcado como tomado
+  Future<void> rescheduleNotificationsTaken(dose) async {
+    await rescheduleAllNotifications(); // Reagenda todas as notificações para garantir consistência que sempre terá notificações
+    await _notificationService.cancelMedicationNotifications(dose); // Cancela as notificações específicas deste medicamento que já foi tomado
   }
 
   /// Desmarca uma dose como tomada (remove do registro)
@@ -170,6 +175,7 @@ class SchedulesController extends GetxController {
       whereArgs: [takenDoseId],
     );
     await fetchSchedulesForSelectedDate();
+    rescheduleAllNotifications();
   }
 
   /// Calcula o status de uma dose baseado no horário atual
@@ -256,7 +262,7 @@ class SchedulesController extends GetxController {
     final result = await db.rawQuery(
       '''
       SELECT 
-        s.id, s.idPerfil, s.hora, s.dose, s.intervalo, s.dias, s.dataInicio, s.dataFim, s.paraSempre, s.observacao, s.idMedicamento, s.dataCriacao, s.deletado,
+        s.id, s.idPerfil, s.hora, s.dose, s.intervalo, s.dias, s.dataInicio, s.dataFim, s.paraSempre, s.observacao, s.idMedicamento, s.dataCriacao, s.deletado, s.idAgendamentoPai,
         m.nome as medicationName, m.caminhoImagem as caminhoImagem
       FROM tblMedicamentosAgendados s
       INNER JOIN tblMedicamentos m ON s.idMedicamento = m.id
@@ -554,6 +560,7 @@ class SchedulesController extends GetxController {
     }
 
     await fetchSchedulesForSelectedDate();
+    rescheduleAllNotifications();
   }
 
   /// Atualiza uma dose específica (dose, observação, etc.)
@@ -603,6 +610,7 @@ class SchedulesController extends GetxController {
 
     // Atualiza a UI para refletir as mudanças
     await fetchSchedulesForSelectedDate();
+    rescheduleAllNotifications();
   }
 
   /// Obtém detalhes de um agendamento específico
@@ -612,7 +620,7 @@ class SchedulesController extends GetxController {
     final result = await db.rawQuery(
       '''
       SELECT 
-        s.id, s.idPerfil, s.hora, s.dose, s.intervalo, s.dias, s.dataInicio, s.dataFim, s.paraSempre, s.observacao, s.idMedicamento, s.dataCriacao, s.deletado,
+        s.id, s.idPerfil, s.hora, s.dose, s.intervalo, s.dias, s.dataInicio, s.dataFim, s.paraSempre, s.observacao, s.idMedicamento, s.dataCriacao, s.deletado, s.idAgendamentoPai,
         m.nome as medicationName, m.caminhoImagem as caminhoImagem
       FROM tblMedicamentosAgendados s
       INNER JOIN tblMedicamentos m ON s.idMedicamento = m.id
@@ -641,8 +649,10 @@ class SchedulesController extends GetxController {
 
     // 3. Itera sobre cada agendamento para calcular e agendar suas doses futuras.
     for (var schedule in allSchedules) {
-      // Define um limite para não agendar notificações para sempre (ex: próximos 30 dias)
-      final scheduleLimit = now.add(const Duration(days: 30));
+      // Define um limite para não agendar notificações para sempre (ex: próximos 3 dias)
+      final scheduleLimit = now.add(
+        const Duration(days: 3),
+      ); // Usei 3 dias para evitar estourar o limite de notificações do Android (500 por app)
 
       // Validações de data (essencial para evitar bugs)
       if (schedule.dataInicio == null) continue;

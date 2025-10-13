@@ -1,3 +1,4 @@
+import 'package:app_remedio/models/profile_model.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
@@ -8,12 +9,20 @@ import 'package:app_remedio/controllers/settings_controller.dart';
 import 'package:app_remedio/controllers/notification_controller.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:convert';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'dart:io';
+import 'package:app_remedio/controllers/profile_controller.dart';
+import 'package:app_remedio/controllers/schedules_controller.dart';
 
 class NotificationService {
   final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
   late final NotificationController _notificationController;
+
+  static const String _channelName = 'Lembretes de Medicamentos';
+  static const String _channelDescription =
+      'Canal para notificações de medicamentos';
 
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
@@ -52,7 +61,10 @@ class NotificationService {
         print('✅ Serviço de notificações inicializado com sucesso');
 
         // Cria o canal de notificação para Android
-        await _createNotificationChannel();
+        final settings = Get.find<SettingsController>();
+        await _createNotificationChannel(
+          soundUri: settings.notificationSoundUri.value,
+        );
       } else {
         print('❌ Falha ao inicializar serviço de notificações');
       }
@@ -70,23 +82,27 @@ class NotificationService {
     if (response.payload != null && response.payload!.isNotEmpty) {
       try {
         final Map<String, dynamic> data = jsonDecode(response.payload!);
-        
+
         // 1. Salva a notificação no banco e pega o ID recém-criado.
-        final int? newNotificationId = await _notificationController.saveNotificationToDatabase(
-          idAgendamento: data['idAgendamento'],
-          horarioAgendado: data['horarioAgendado'],
-          titulo: data['titulo'],
-          mensagem: data['mensagem'],
-        );
+        final int? newNotificationId = await _notificationController
+            .saveNotificationToDatabase(
+              idAgendamento: data['idAgendamento'],
+              horarioAgendado: data['horarioAgendado'],
+              titulo: data['titulo'],
+              mensagem: data['mensagem'],
+            );
 
         // 2. Se o salvamento foi bem-sucedido, imediatamente marca como lida.
         if (newNotificationId != null) {
-          print('✅ Notificação salva com ID $newNotificationId. Marcando como lida...');
+          print(
+            '✅ Notificação salva com ID $newNotificationId. Marcando como lida...',
+          );
           await _notificationController.markAsRead(newNotificationId);
         } else {
-          print('⚠️ Falha ao salvar a notificação, não foi possível marcar como lida.');
+          print(
+            '⚠️ Falha ao salvar a notificação, não foi possível marcar como lida.',
+          );
         }
-
       } catch (e) {
         print('❌ Erro ao processar payload da notificação: $e');
       }
@@ -114,18 +130,75 @@ class NotificationService {
           print('❌ Permissão de alarme exato negada');
         }
       }
+
+      // 3. Permissão para LER o som do dispositivo (O PONTO CHAVE!)
+      if (Platform.isAndroid) {
+        final deviceInfo = await DeviceInfoPlugin().androidInfo;
+        Permission storagePermission;
+
+        // A partir do Android 13 (SDK 33), a permissão mudou
+        if (deviceInfo.version.sdkInt >= 33) {
+          storagePermission =
+              Permission.audio; // Permissão específica para áudio
+        } else {
+          storagePermission =
+              Permission.storage; // Permissão genérica para armazenamento
+        }
+
+        final status = await storagePermission.status;
+        if (status.isDenied) {
+          print('🔔 Solicitando permissão de acesso ao áudio/armazenamento...');
+          await storagePermission.request();
+        }
+      }
     } catch (e) {
       print('❌ Erro ao solicitar permissões: $e');
     }
   }
 
-  Future<void> _createNotificationChannel() async {
-    const AndroidNotificationChannel channel = AndroidNotificationChannel(
-      'medication_channel_id',
-      'Lembretes de Medicamentos',
-      description: 'Canal para notificações de medicamentos',
+  String _getChannelIdForSound(String? soundUri) {
+    if (soundUri == null || soundUri.isEmpty || soundUri == 'silent') {
+      // ID padrão para som padrão ou silencioso
+      return 'medication_channel_default';
+    } else {
+      // Gera um ID único e consistente para cada som customizado
+      return 'medication_channel_${soundUri.hashCode}';
+    }
+  }
+
+  Future<void> recreateNotificationChannel({
+    required String? oldSoundUri, // Precisamos saber o antigo para deletar
+    required String? newSoundUri, // E o novo para criar
+  }) async {
+    final oldChannelId = _getChannelIdForSound(oldSoundUri);
+    await _notificationsPlugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
+        ?.deleteNotificationChannel(oldChannelId);
+
+    await _createNotificationChannel(soundUri: newSoundUri);
+    final schedulesController = Get.find<SchedulesController>();
+    await schedulesController.rescheduleAllNotifications();
+    print('✅ Canal de notificação recriado com novo som e todas as notificações reagendadas');
+  }
+
+  // <--- MÉTODO PRIVADO MODIFICADO --->
+  /// Cria o canal de notificação com um som específico.
+  Future<void> _createNotificationChannel({String? soundUri}) async {
+    final channelId = _getChannelIdForSound(soundUri);
+    AndroidNotificationSound? sound;
+    if (soundUri != null && soundUri.isNotEmpty && soundUri != 'silent') {
+      sound = UriAndroidNotificationSound(soundUri);
+    }
+
+    final AndroidNotificationChannel channel = AndroidNotificationChannel(
+      channelId,
+      _channelName,
+      description: _channelDescription,
       importance: Importance.max,
       playSound: true,
+      sound: sound, // <-- O som é definido AQUI, na criação!
       enableVibration: true,
     );
 
@@ -149,6 +222,9 @@ class NotificationService {
   Future<void> scheduleMedicationNotifications(TodayDose dose) async {
     try {
       final settings = Get.find<SettingsController>();
+      final profileController = Get.find<ProfileController>();
+      final profile = await profileController.getProfileById(dose.idPerfil);
+
       if (!settings.notificationsEnabled.value) {
         print('🔕 Notificações desabilitadas nas configurações');
         return;
@@ -177,7 +253,7 @@ class NotificationService {
             ),
             title: 'Lembrete de Medicamento',
             body:
-                '${settings.reminderText.value} ${dose.medicationName} às ${DateFormat('HH:mm').format(dose.scheduledTime)}.',
+                'Olá, ${profile?.nome ?? 'Usuário'}! Está na hora de tomar seu medicamento! Tomar ${dose.medicationName} (${dose.dose}) às ${DateFormat('HH:mm').format(dose.scheduledTime)}.',
             scheduledDate: tz.TZDateTime.from(scheduledTimeBefore, tz.local),
             idAgendamento: dose.scheduledMedicationId,
           );
@@ -200,7 +276,7 @@ class NotificationService {
             ),
             title: 'Medicamento Atrasado',
             body:
-                'Você já tomou seu ${dose.medicationName} das ${DateFormat('HH:mm').format(dose.scheduledTime)}?',
+                'Olá, ${profile?.nome ?? 'Usuário'}! Você já tomou seu ${dose.medicationName} das ${DateFormat('HH:mm').format(dose.scheduledTime)}?',
             scheduledDate: tz.TZDateTime.from(scheduledTimeAfter, tz.local),
             idAgendamento: dose.scheduledMedicationId,
           );
@@ -224,13 +300,38 @@ class NotificationService {
     try {
       final settings = Get.find<SettingsController>();
 
-      final sound = settings.sound.value == 'default'
-          ? null
-          : RawResourceAndroidNotificationSound(settings.sound.value);
+      AndroidNotificationSound? sound;
+      String? iosSound;
+
+      // Verifica se um som customizado foi selecionado
+      if (settings.notificationSoundUri.value != null &&
+          settings.notificationSoundUri.value!.isNotEmpty) {
+        // AQUI É A MUDANÇA
+        if (settings.notificationSoundUri.value == 'silent') {
+          // Se for 'silent', não definimos nenhum som
+          sound = null;
+          iosSound = null; // Para iOS, `null` desativa o som
+        } else {
+          // Lógica para Android que já tínhamos, está correta.
+          sound = UriAndroidNotificationSound(
+            settings.notificationSoundUri.value!,
+          );
+          iosSound =
+              'default'; // iOS continua usando o padrão mesmo com URI do Android
+        }
+      } else {
+        // Se 'Padrão' estiver selecionado
+        sound = null;
+        iosSound = 'default';
+      }
+
+      final channelId = _getChannelIdForSound(
+        settings.notificationSoundUri.value,
+      );
 
       final AndroidNotificationDetails androidDetails =
           AndroidNotificationDetails(
-            'medication_channel_id',
+            channelId,
             'Lembretes de Medicamentos',
             channelDescription: 'Canal para notificações de medicamentos',
             importance: Importance.max,
@@ -323,37 +424,71 @@ class NotificationService {
         return;
       }
 
-      const AndroidNotificationDetails androidDetails =
+      final settings = Get.find<SettingsController>();
+
+      // Lógica de som e vibração (igual à do agendamento real)
+      AndroidNotificationSound? sound;
+      String? iosSound;
+      bool presentIosSound = true;
+
+      if (settings.notificationSoundUri.value != null &&
+          settings.notificationSoundUri.value!.isNotEmpty) {
+        if (settings.notificationSoundUri.value == 'silent') {
+          sound = null;
+          iosSound = null;
+          presentIosSound = false;
+        } else {
+          sound = UriAndroidNotificationSound(
+            settings.notificationSoundUri.value!,
+          );
+          iosSound = 'default.wav';
+        }
+      } else {
+        sound = null;
+        iosSound = 'default.wav';
+      }
+
+      final channelId = _getChannelIdForSound(settings.notificationSoundUri.value);
+      final AndroidNotificationDetails androidDetails =
           AndroidNotificationDetails(
-            'medication_channel_id',
+            channelId,
             'Lembretes de Medicamentos',
             channelDescription: 'Canal para notificações de medicamentos',
             importance: Importance.max,
             priority: Priority.high,
             icon: '@mipmap/launcher_icon',
+            sound: sound, // <--- USA O SOM DAS CONFIGURAÇÕES
+            enableVibration: settings
+                .vibrateEnabled
+                .value, // <--- USA A VIBRAÇÃO DAS CONFIGURAÇÕES
           );
 
-      const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
-        presentSound: true,
+      final DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
+        presentSound: presentIosSound,
+        sound: iosSound,
       );
 
-      const NotificationDetails notificationDetails = NotificationDetails(
+      final NotificationDetails notificationDetails = NotificationDetails(
         android: androidDetails,
         iOS: iosDetails,
       );
 
+      // Cria um payload para que o toque na notificação de teste também seja testado
+      final payloadMap = {
+        'idAgendamento': 9999, // ID Fixo para testes
+        'horarioAgendado': DateFormat('HH:mm').format(DateTime.now()),
+        'titulo': 'Teste de Notificação',
+        'mensagem':
+            'Se você está vendo isso, as notificações estão funcionando!',
+      };
+      final String payloadString = jsonEncode(payloadMap);
+
       await _notificationsPlugin.show(
-        999,
+        999, // ID da notificação em si
         'Teste de Notificação',
         'Se você está vendo isso, as notificações estão funcionando!',
         notificationDetails,
-      );
-
-      await _notificationController.saveNotificationToDatabase(
-        idAgendamento: 1,
-        horarioAgendado: DateFormat('HH:mm').format(DateTime.now()),
-        titulo: 'Teste de Notificação',
-        mensagem: 'Se você está vendo isso, as notificações estão funcionando!',
+        payload: payloadString, // <--- USA O PAYLOAD
       );
 
       print('✅ Notificação de teste enviada');

@@ -13,7 +13,7 @@ class NotificationListScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     // Encontra o controller de notificações e o de tema
     final notificationController = Get.find<NotificationController>();
-    
+
     return Scaffold(
       backgroundColor: scaffoldBackgroundColor,
       appBar: AppBar(
@@ -24,15 +24,26 @@ class NotificationListScreen extends StatelessWidget {
         elevation: 0,
         actions: [
           // Botão para marcar todas como lidas
-          Obx(() => notificationController.unreadCount.value > 0 ? IconButton(
-            icon: Icon(Icons.mark_email_read_outlined, color: primaryColor),
-            onPressed: () => _showMarkAllAsReadDialog(context, notificationController),
-            tooltip: 'Marcar todas como lidas',
-          ) : const SizedBox.shrink()),
+          Obx(
+            () => notificationController.unreadCount.value > 0
+                ? IconButton(
+                    icon: Icon(
+                      Icons.mark_email_read_outlined,
+                      color: primaryColor,
+                    ),
+                    onPressed: () => _showMarkAllAsReadDialog(
+                      context,
+                      notificationController,
+                    ),
+                    tooltip: 'Marcar todas como lidas',
+                  )
+                : const SizedBox.shrink(),
+          ),
           // Botão para limpar notificações antigas
           IconButton(
             icon: Icon(Icons.delete_sweep_outlined, color: primaryColor),
-            onPressed: () => _showCleanOldDialog(context, notificationController),
+            onPressed: () =>
+                _showCleanOldDialog(context, notificationController),
             tooltip: 'Limpar',
           ),
         ],
@@ -40,9 +51,7 @@ class NotificationListScreen extends StatelessWidget {
       body: Obx(() {
         // Estado de carregamento
         if (notificationController.isLoading.value) {
-          return Center(
-            child: CircularProgressIndicator(color: primaryColor),
-          );
+          return Center(child: CircularProgressIndicator(color: primaryColor));
         }
 
         // Estado de lista vazia
@@ -59,7 +68,10 @@ class NotificationListScreen extends StatelessWidget {
             itemCount: notificationController.notifications.length,
             itemBuilder: (context, index) {
               final notification = notificationController.notifications[index];
-              return _buildNotificationCard(notification, notificationController);
+              return _buildNotificationCard(
+                notification,
+                notificationController,
+              );
             },
           ),
         );
@@ -89,9 +101,7 @@ class NotificationListScreen extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             'Seus lembretes e alertas de medicamentos\naparecerão aqui quando forem enviados.',
-            style: bodyTextStyle.copyWith(
-              color: textColor.withOpacity(0.6),
-            ),
+            style: bodyTextStyle.copyWith(color: textColor.withOpacity(0.6)),
             textAlign: TextAlign.center,
           ),
         ],
@@ -100,12 +110,10 @@ class NotificationListScreen extends StatelessWidget {
   }
 
   /// Constrói o card de uma notificação individual.
-  Widget _buildNotificationCard(NotificationModel notification, NotificationController controller) {
-    // Determina a cor e o ícone com base no título e se foi lida
-    final bool isReminder = notification.titulo.toLowerCase().contains('lembrete');
-    final IconData iconData = isReminder ? Icons.alarm : Icons.warning_amber_rounded;
-    final Color iconColor = isReminder ? Colors.blueAccent : Colors.orange;
-
+  Widget _buildNotificationCard(
+    NotificationModel notification,
+    NotificationController controller,
+  ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -135,23 +143,32 @@ class NotificationListScreen extends StatelessWidget {
           child: Row(
             children: [
               // Ícone da notificação
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: notification.lida
-                      ? textColor.withOpacity(0.1)
-                      : iconColor.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Icon(
-                  iconData,
-                  color: notification.lida
-                      ? textColor.withOpacity(0.4)
-                      : iconColor,
-                  size: 24,
+              InkWell(
+                onTap: () {
+                  // Ação só é executada se a notificação ainda não foi lida
+                  if (!notification.lida) {
+                    controller.markAsRead(notification.id);
+                  }else {
+                    controller.markAsUnread(notification.id);
+                  }
+                },
+                borderRadius: BorderRadius.circular(
+                  30.0,
+                ), // Efeito de toque circular
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0), // Aumenta a área de toque
+                  child: Icon(
+                    // Ícone muda com base no status 'lida'
+                    notification.lida ? Icons.circle_outlined : Icons.circle,
+                    // Cor também muda com base no status
+                    color: notification.lida
+                        ? textColor.withOpacity(0.4)
+                        : primaryColor,
+                    size: 20,
+                  ),
                 ),
               ),
+              const SizedBox(width: 12),
               const SizedBox(width: 16),
               // Conteúdo (título, mensagem, data)
               Expanded(
@@ -161,7 +178,9 @@ class NotificationListScreen extends StatelessWidget {
                     Text(
                       notification.titulo,
                       style: TextStyle(
-                        fontWeight: notification.lida ? FontWeight.normal : FontWeight.bold,
+                        fontWeight: notification.lida
+                            ? FontWeight.normal
+                            : FontWeight.bold,
                         color: textColor,
                         fontSize: 16,
                       ),
@@ -178,7 +197,9 @@ class NotificationListScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      DateFormat('dd/MM/yyyy \'às\' HH:mm').format(notification.dataCriacao),
+                      DateFormat(
+                        'dd/MM/yyyy \'às\' HH:mm',
+                      ).format(notification.dataCriacao),
                       style: TextStyle(
                         color: textColor.withOpacity(0.5),
                         fontSize: 12,
@@ -192,21 +213,28 @@ class NotificationListScreen extends StatelessWidget {
               PopupMenuButton<String>(
                 icon: Icon(Icons.more_vert, color: textColor.withOpacity(0.6)),
                 color: surfaceColor,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                onSelected: (value) => _handleMenuAction(value, notification, controller),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                onSelected: (value) =>
+                    _handleMenuAction(value, notification, controller),
                 itemBuilder: (context) => [
                   PopupMenuItem(
                     value: notification.lida ? 'mark_unread' : 'mark_read',
                     child: Row(
                       children: [
                         Icon(
-                          notification.lida ? Icons.mark_email_unread_outlined : Icons.mark_email_read_outlined,
+                          notification.lida
+                              ? Icons.mark_email_unread_outlined
+                              : Icons.mark_email_read_outlined,
                           size: 20,
                           color: textColor,
                         ),
                         const SizedBox(width: 12),
                         Text(
-                          notification.lida ? 'Marcar como não lida' : 'Marcar como lida',
+                          notification.lida
+                              ? 'Marcar como não lida'
+                              : 'Marcar como lida',
                           style: TextStyle(color: textColor),
                         ),
                       ],
@@ -232,7 +260,11 @@ class NotificationListScreen extends StatelessWidget {
   }
 
   /// Gerencia as ações do menu popup.
-  void _handleMenuAction(String action, NotificationModel notification, NotificationController controller) {
+  void _handleMenuAction(
+    String action,
+    NotificationModel notification,
+    NotificationController controller,
+  ) {
     switch (action) {
       case 'mark_read':
         controller.markAsRead(notification.id);
@@ -247,13 +279,19 @@ class NotificationListScreen extends StatelessWidget {
   }
 
   /// Mostra um dialog de confirmação para excluir uma notificação.
-  void _showDeleteDialog(NotificationModel notification, NotificationController controller) {
+  void _showDeleteDialog(
+    NotificationModel notification,
+    NotificationController controller,
+  ) {
     Get.dialog(
       AlertDialog(
         backgroundColor: surfaceColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text('Excluir Notificação', style: heading2Style),
-        content: Text('Tem certeza que deseja excluir esta notificação?', style: bodyTextStyle),
+        content: Text(
+          'Tem certeza que deseja excluir esta notificação?',
+          style: bodyTextStyle,
+        ),
         actions: [
           TextButton(
             onPressed: () => Get.back(),
@@ -277,7 +315,10 @@ class NotificationListScreen extends StatelessWidget {
   }
 
   /// Mostra um dialog para marcar todas as notificações como lidas.
-  void _showMarkAllAsReadDialog(BuildContext context, NotificationController controller) {
+  void _showMarkAllAsReadDialog(
+    BuildContext context,
+    NotificationController controller,
+  ) {
     final unreadCount = controller.unreadCount.value;
     if (unreadCount == 0) return;
 
@@ -286,7 +327,10 @@ class NotificationListScreen extends StatelessWidget {
         backgroundColor: surfaceColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text('Marcar Todas como Lidas', style: heading2Style),
-        content: Text('Deseja marcar todas as $unreadCount notificações como lidas?', style: bodyTextStyle),
+        content: Text(
+          'Deseja marcar todas as $unreadCount notificações como lidas?',
+          style: bodyTextStyle,
+        ),
         actions: [
           TextButton(
             onPressed: () => Get.back(),
@@ -297,11 +341,17 @@ class NotificationListScreen extends StatelessWidget {
               Get.back();
               controller.markAllAsRead();
               if (context.mounted) {
-                ToastService.showSuccess(context, 'Todas as notificações foram marcadas como lidas');
+                ToastService.showSuccess(
+                  context,
+                  'Todas as notificações foram marcadas como lidas',
+                );
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
-            child: const Text('Confirmar', style: TextStyle(color: Colors.white)),
+            child: const Text(
+              'Confirmar',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -309,13 +359,19 @@ class NotificationListScreen extends StatelessWidget {
   }
 
   /// Mostra um dialog para limpar notificações.
-  void _showCleanOldDialog(BuildContext context, NotificationController controller) {
+  void _showCleanOldDialog(
+    BuildContext context,
+    NotificationController controller,
+  ) {
     Get.dialog(
       AlertDialog(
         backgroundColor: surfaceColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text('Limpar Notificações', style: heading2Style),
-        content: Text('Deseja excluir todas as notificações?', style: bodyTextStyle),
+        content: Text(
+          'Deseja excluir todas as notificações?',
+          style: bodyTextStyle,
+        ),
         actions: [
           TextButton(
             onPressed: () => Get.back(),

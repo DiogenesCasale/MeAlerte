@@ -650,7 +650,7 @@ class ScheduleListScreen extends GetView<SchedulesController> {
             child: Text(
               time,
               style: TextStyle(
-                fontSize: 18, // Era 18.0
+                fontSize: 20, // Era 18.0
                 fontWeight: FontWeight.bold,
                 color: primaryColor,
               ),

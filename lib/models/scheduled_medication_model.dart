@@ -57,6 +57,11 @@ class ScheduledMedication {
     };
   }
 
+  // verificar se é um agendamento único ou seja tem um agendamento pai
+  bool get isEditedSingle {
+    return idAgendamentoPai != null;
+  }
+
   static ScheduledMedication fromMap(Map<String, dynamic> map) {
     return ScheduledMedication(
       id: map['id'],
@@ -197,7 +202,8 @@ class TodayDose {
     int? takenDoseId,
   }) {
     return TodayDose(
-      scheduledMedicationId: scheduledMedicationId ?? this.scheduledMedicationId,
+      scheduledMedicationId:
+          scheduledMedicationId ?? this.scheduledMedicationId,
       idMedicamento: idMedicamento ?? this.idMedicamento,
       medicationName: medicationName ?? this.medicationName,
       dose: dose ?? this.dose,

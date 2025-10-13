@@ -26,6 +26,10 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
   TimeOfDay _selectedTime = TimeOfDay.now();
   ScheduledMedication? _scheduledMedication;
   bool _isLoading = true;
+  int _observacaoLength = 0;
+  static const int _maxObservacaoLength = 250;
+
+  bool isEditedSingle = false;
 
   // Variáveis para o novo sistema de datas
   DateTime? _dataInicio;
@@ -53,6 +57,8 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
       _observacaoController.text = _scheduledMedication!.observacao ?? '';
       _selectedTime = TimeOfDay.fromDateTime(widget.dose.scheduledTime);
 
+      isEditedSingle = _scheduledMedication!.isEditedSingle;
+
       // Preencher dados do novo seletor de duração
       _paraSempre = _scheduledMedication!.paraSempre;
       if (_scheduledMedication!.dataInicio != null) {
@@ -74,6 +80,20 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
           ); // Fallback para 30 dias
         }
       }
+
+      final int obsLength = _scheduledMedication!.observacao?.length ?? 0;
+      if (obsLength > 0) {
+        setState(() {
+          _observacaoLength = obsLength;
+        });
+      }
+
+      // Listener para contar caracteres da observação
+      _observacaoController.addListener(() {
+        setState(() {
+          _observacaoLength = _observacaoController.text.length;
+        });
+      });
 
       setState(() {
         _isLoading = false;
@@ -310,7 +330,7 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
         body: Center(child: CircularProgressIndicator(color: primaryColor)),
       );
     }
-
+    final bool isFrequencyEditingEnabled = !isEditedSingle;
     return Scaffold(
       backgroundColor: scaffoldBackgroundColor,
       appBar: AppBar(
@@ -356,6 +376,7 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
                 ),
               ),
               const SizedBox(height: 24),
+              if (isEditedSingle) _buildWarningBanner(),
 
               // Dose
               // WidgetsDefault.buildTextField(
@@ -381,19 +402,29 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
               const SizedBox(height: 20),
 
               // Intervalo
-              WidgetsDefault.buildTextField(
-                controller: _intervalController,
-                label: 'Intervalo (horas) *',
-                hint: '8',
-                keyboardType: TextInputType.number,
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty)
-                    return 'Intervalo é obrigatório';
-                  final interval = int.tryParse(v);
-                  if (interval == null)
-                    return 'Intervalo deve ser um número válido';
-                  return null;
-                },
+              Opacity(
+                opacity: isFrequencyEditingEnabled ? 1.0 : 0.5,
+                child: IgnorePointer(
+                  ignoring: !isFrequencyEditingEnabled,
+                  child: WidgetsDefault.buildTextField(
+                    controller: _intervalController,
+                    label: 'Intervalo (horas) *',
+                    hint: '8',
+                    // A propriedade 'enabled' também pode ser usada se seu widget a suportar
+                    // enabled: isFrequencyEditingEnabled,
+                    keyboardType: TextInputType.number,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) {
+                        return 'Intervalo é obrigatório';
+                      }
+                      final interval = int.tryParse(v);
+                      if (interval == null) {
+                        return 'Intervalo deve ser um número válido';
+                      }
+                      return null;
+                    },
+                  ),
+                ),
               ),
               const SizedBox(height: 20),
 
@@ -402,12 +433,7 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
               const SizedBox(height: 20),
 
               // Observações
-              WidgetsDefault.buildTextField(
-                controller: _observacaoController,
-                label: 'Observações (opcional)',
-                hint: 'Observações adicionais...',
-                maxLines: 3,
-              ),
+              _buildObservationField(),
               const SizedBox(height: 40),
 
               // Botão salvar
@@ -464,87 +490,160 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
   }
 
   Widget _buildDurationSelector() {
+    // Define se os campos de frequência estarão habilitados
+    final bool isEnabled = !isEditedSingle;
+
+    return Opacity(
+      opacity: isEnabled ? 1.0 : 0.5,
+      child: IgnorePointer(
+        ignoring: !isEnabled,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text('Duração do Tratamento *', style: heading2Style),
+                const SizedBox(width: 8),
+                if (_dataInicio != null)
+                  Icon(Icons.lock, size: 16, color: textColor.withOpacity(0.6)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                color: backgroundColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: textColor.withOpacity(0.3)),
+              ),
+              child: Column(
+                children: [
+                  // Data de Início (desabilitada para edição)
+                  WidgetsDefault.buildDateField(
+                    label: 'Data Início',
+                    value: _dataInicio,
+                    onTap: () {}, // Não permite clique
+                    isRequired: true,
+                    isEnabled: false, // Desabilita visualmente
+                  ),
+                  const SizedBox(height: 16),
+
+                  WidgetsDefault.buildDateField(
+                    label: 'Data Fim',
+                    value: _dataFim,
+                    onTap: () => _selectEndDate(),
+                    isRequired: !_paraSempre,
+                    isEnabled: !_paraSempre && isEnabled,
+                  ),
+
+                  const SizedBox(height: 4),
+
+                  // ALTERAÇÃO 3: O InkWell com o Checkbox foi movido para baixo e alinhado à direita.
+                  Row(
+                    mainAxisAlignment:
+                        MainAxisAlignment.end, // Alinha à direita
+                    children: [
+                      InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () {
+                          if (!isEnabled)
+                            return; // Não faz nada se desabilitado
+                          setState(() {
+                            _paraSempre = !_paraSempre;
+                            if (_paraSempre) _dataFim = null;
+                          });
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4.0,
+                            vertical: 6.0,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Checkbox(
+                                value: _paraSempre,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _paraSempre = value ?? false;
+                                    if (_paraSempre) _dataFim = null;
+                                  });
+                                },
+                                activeColor: primaryColor,
+                              ),
+                              Text(
+                                'Para Sempre',
+                                style: TextStyle(color: textColor),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildObservationField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Duração do Tratamento *', style: heading2Style),
-            const SizedBox(width: 8),
-            if (_dataInicio != null)
-              Icon(Icons.lock, size: 16, color: textColor.withOpacity(0.6)),
+            Text('Observações', style: heading2Style),
+            Text(
+              '$_observacaoLength/$_maxObservacaoLength',
+              style: TextStyle(
+                color: _observacaoLength > _maxObservacaoLength
+                    ? Colors.red
+                    : textColor.withOpacity(0.6),
+                fontSize: 12,
+              ),
+            ),
           ],
         ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(16.0),
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: textColor.withOpacity(0.3)),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _observacaoController,
+          maxLines: 3,
+          maxLength: _maxObservacaoLength,
+          style: TextStyle(color: textColor),
+          decoration: InputDecoration(
+            hintText: 'Observações adicionais (opcional)',
+            hintStyle: TextStyle(color: textColor.withValues(alpha: 0.5)),
+            filled: true,
+            fillColor: backgroundColor,
+            counterText: '', // Remove contador padrão
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12.0),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12.0),
+              borderSide: BorderSide(color: textColor.withValues(alpha: 0.3)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12.0),
+              borderSide: BorderSide(color: primaryColor, width: 2),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12.0),
+              borderSide: BorderSide(color: secondaryColor, width: 2),
+            ),
           ),
-          child: Column(
-            children: [
-              // Data de Início (desabilitada para edição)
-              WidgetsDefault.buildDateField(
-                label: 'Data Início',
-                value: _dataInicio,
-                onTap: () {}, // Não permite clique
-                isRequired: true,
-                isEnabled: false, // Desabilita visualmente
-              ),
-              const SizedBox(height: 16),
-              WidgetsDefault.buildDateField(
-                label: 'Data Fim',
-                value: _dataFim,
-                onTap: () => _selectEndDate(),
-                isRequired: !_paraSempre,
-                isEnabled: !_paraSempre,
-              ),
-              const SizedBox(height: 4),
-
-              // ALTERAÇÃO 3: O InkWell com o Checkbox foi movido para baixo e alinhado à direita.
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end, // Alinha à direita
-                children: [
-                  InkWell(
-                    borderRadius: BorderRadius.circular(8),
-                    onTap: () {
-                      setState(() {
-                        _paraSempre = !_paraSempre;
-                        if (_paraSempre) _dataFim = null;
-                      });
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4.0,
-                        vertical: 6.0,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Checkbox(
-                            value: _paraSempre,
-                            onChanged: (value) {
-                              setState(() {
-                                _paraSempre = value ?? false;
-                                if (_paraSempre) _dataFim = null;
-                              });
-                            },
-                            activeColor: primaryColor,
-                          ),
-                          Text(
-                            'Para Sempre',
-                            style: TextStyle(color: textColor),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+          validator: (value) {
+            if (value != null && value.length > _maxObservacaoLength) {
+              return 'Observação não pode exceder $_maxObservacaoLength caracteres';
+            }
+            return null;
+          },
         ),
       ],
     );
@@ -635,6 +734,35 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  // Widget de aviso para agendamentos únicos
+  Widget _buildWarningBanner() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24.0), // Espaço abaixo do aviso
+      padding: const EdgeInsets.all(12.0),
+      decoration: BoxDecoration(
+        color: Colors.orange.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8.0),
+        border: Border.all(color: Colors.orange.withOpacity(0.5)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline, color: Colors.orange[800]),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Este é um horário editado individualmente. Não é possível alterar o intervalo ou a duração. As alterações serão aplicadas apenas a este horário específico.',
+              style: TextStyle(
+                color: Colors.orange[900],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

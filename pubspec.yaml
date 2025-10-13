@@ -1,7 +1,7 @@
 name: app_remedio
 description: "A new Flutter project."
 publish_to: 'none'
-version: 0.3.1
+version: 0.3.2
 
 environment:
   sdk: ^3.9.0
@@ -27,6 +27,9 @@ dependencies:
   timezone: ^0.10.1 # Para lidar com fusos horários nas notificações
   fl_chart: ^1.1.1 # Gráficos, especialmente para a tela de dados de saúde
   permission_handler: ^11.3.1 # Para solicitar permissões em tempo de execução
+  jbh_ringtone: ^1.0.3 # Para tocar toques personalizados nas notificações
+  device_info_plus: ^10.1.2 # Para obter informações do dispositivo
+
 
 dev_dependencies:
   flutter_test:
