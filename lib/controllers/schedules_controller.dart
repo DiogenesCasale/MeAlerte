@@ -131,7 +131,9 @@ class SchedulesController extends GetxController {
   // Metodo auxiliar para reagendar e cancelar notificações quando for marcado como tomado
   Future<void> rescheduleNotificationsTaken(dose) async {
     await rescheduleAllNotifications(); // Reagenda todas as notificações para garantir consistência que sempre terá notificações
-    await _notificationService.cancelMedicationNotifications(dose); // Cancela as notificações específicas deste medicamento que já foi tomado
+    await _notificationService.cancelMedicationNotifications(
+      dose,
+    ); // Cancela as notificações específicas deste medicamento que já foi tomado
   }
 
   /// Desmarca uma dose como tomada (remove do registro)
@@ -760,6 +762,11 @@ class SchedulesController extends GetxController {
               'INFO: Notificação perdida encontrada para ${schedule.medicationName} às $horarioAgendado. Salvando...',
             );
 
+            final profileController = Get.find<ProfileController>();
+            final profile = await profileController.getProfileById(
+              schedule.idPerfil,
+            );
+
             // Cria os dados para o lembrete
             final settings = Get.find<SettingsController>();
             final reminderTime = doseTime.subtract(
@@ -771,7 +778,8 @@ class SchedulesController extends GetxController {
                 horarioAgendado: horarioAgendado,
                 titulo: 'Lembrete de Medicamento',
                 mensagem:
-                    '${settings.reminderText.value} ${schedule.medicationName} às $horarioAgendado.',
+                    'Olá, ${profile?.nome ?? 'Usuário'}! Está na hora de tomar seu medicamento! Tomar ${schedule.medicationName} (${schedule.dose}) às $horarioAgendado}.',
+                idPerfil: schedule.idPerfil,
               );
             }
 
@@ -785,7 +793,8 @@ class SchedulesController extends GetxController {
                 horarioAgendado: horarioAgendado,
                 titulo: 'Medicamento Atrasado',
                 mensagem:
-                    'Você já tomou seu ${schedule.medicationName} das $horarioAgendado?',
+                    'Olá, ${profile?.nome ?? 'Usuário'}! Você já tomou seu ${schedule.medicationName} das $horarioAgendado?',
+                idPerfil: schedule.idPerfil,
               );
             }
           }

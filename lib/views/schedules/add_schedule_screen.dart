@@ -291,10 +291,12 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
       }
     }
 
+    final doseText = _doseController.text.trim().replaceAll(',', '.');
+
     try {
       final scheduledMedication = ScheduledMedication(
         idMedicamento: _selectedMedication!.id!,
-        dose: double.parse(_doseController.text.trim()),
+        dose: double.parse(doseText),
         hora:
             '${_selectedTime.hour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')}',
         intervalo: int.parse(_intervalController.text),
@@ -800,8 +802,13 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
             keyboardType: TextInputType.numberWithOptions(decimal: true),
             validator: (v) {
               if (v == null || v.trim().isEmpty) return 'Dose obrigatória';
-              final dose = double.tryParse(v.trim());
-              if (dose == null || dose <= 0) return 'Dose deve ser > 0';
+
+              // >>> MODIFICAÇÃO AQUI <<<
+              // Substitui a vírgula por ponto para a validação
+              final doseValue = v.trim().replaceAll(',', '.');
+              final dose = double.tryParse(doseValue);
+
+              if (dose == null || dose <= 0) return 'Dose inválida';
               return null;
             },
           ),

@@ -106,7 +106,7 @@ class DatabaseController {
       CREATE TABLE tblMedicamentos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nome TEXT NOT NULL,
-        estoque INTEGER NOT NULL DEFAULT 0,
+        estoque REAL NOT NULL DEFAULT 0,
         tipo TEXT NOT NULL DEFAULT 'comprimido',
         deletado INTEGER DEFAULT 0,
         caminhoImagem TEXT NULL,
@@ -401,7 +401,8 @@ class DatabaseController {
         idPerfil INTEGER NOT NULL DEFAULT 1,
         idDoseTomada INTEGER NULL,
         tipo TEXT NOT NULL,
-        quantidade INTEGER NOT NULL,
+        quantidade REAL NOT NULL,
+        observacao TEXT NULL,
         deletado INTEGER DEFAULT 0,
         dataCriacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (idMedicamento) REFERENCES tblMedicamentos (id) ON DELETE CASCADE,

@@ -1,5 +1,3 @@
-// arquivo: models/stock_history_model.dart
-
 enum StockMovementType {
   entrada,
   saida,
@@ -11,9 +9,10 @@ class StockHistory {
   final int profileId;
   final int? takenDoseId;
   final StockMovementType type;
-  final int quantity;
+  final double quantity;
   final DateTime creationDate;
   final bool deletado;
+  final String? observacao;
 
   // Campo adicional para facilitar a exibição na tela de histórico
   final String? medicationName;
@@ -27,7 +26,8 @@ class StockHistory {
     required this.quantity,
     required this.creationDate,
     this.deletado = false,
-    this.medicationName, // Opcional
+    this.medicationName,
+    this.observacao,
   });
 
   Map<String, dynamic> toMap() {
@@ -40,6 +40,7 @@ class StockHistory {
       'quantidade': quantity,
       'dataCriacao': creationDate.toIso8601String(),
       'deletado': deletado ? 1 : 0,
+      'observacao': observacao,
     };
   }
 
@@ -55,6 +56,7 @@ class StockHistory {
       creationDate: DateTime.parse(map['dataCriacao']),
       deletado: (map['deletado'] ?? 0) == 1,
       medicationName: map['nomeMedicamento'], 
+      observacao: map['observacao'],
     );
   }
 }

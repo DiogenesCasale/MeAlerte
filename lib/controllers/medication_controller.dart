@@ -219,7 +219,11 @@ class MedicationController extends GetxController {
     return null;
   }
 
-  Future<void> addStock(int medicationId, int amountToAdd) async {
+  Future<void> addStock(
+    int medicationId,
+    double amountToAdd, {
+    String? observacao,
+  }) async {
     final db = await _dbController.database;
 
     final medication = await getMedicationById(medicationId);
@@ -227,7 +231,15 @@ class MedicationController extends GetxController {
       throw Exception('Medicamento com ID $medicationId não encontrado.');
     }
 
-    final newStock = medication.estoque + amountToAdd;
+    double newStock = medication.estoque + amountToAdd;
+    StockMovementType typeMovi;
+
+    bool isPositivo = amountToAdd > 0;
+    if (isPositivo) {
+      typeMovi = StockMovementType.entrada;
+    } else {
+      typeMovi = StockMovementType.saida;
+    }
 
     // Atualiza o estoque na tabela principal
     await db.update(
@@ -244,10 +256,12 @@ class MedicationController extends GetxController {
     final historyEntry = StockHistory(
       medicationId: medicationId,
       profileId: ProfileHelper.currentProfileId,
-      type: StockMovementType.entrada,
+      type: typeMovi,
       quantity: amountToAdd,
       creationDate: DateTime.now(),
+      observacao: observacao ?? '',
     );
+
     await db.insert('tblEstoqueMedicamento', historyEntry.toMap());
 
     await fetchAllMedications();
@@ -268,7 +282,7 @@ class MedicationController extends GetxController {
     }
 
     // Calcula o novo estoque
-    final newStock = medication.estoque - doseAmount.toInt();
+    final newStock = medication.estoque - doseAmount;
 
     // Atualiza o estoque no banco
     await db.update(
@@ -287,7 +301,7 @@ class MedicationController extends GetxController {
       profileId: ProfileHelper.currentProfileId,
       takenDoseId: takenDoseId, // Vincula à dose tomada
       type: StockMovementType.saida,
-      quantity: doseAmount.toInt(),
+      quantity: doseAmount,
       creationDate: DateTime.now(),
     );
     await db.insert('tblEstoqueMedicamento', historyEntry.toMap());
@@ -309,25 +323,56 @@ class MedicationController extends GetxController {
     }
   }
 
-  // ADICIONE ESTE NOVO MÉTODO PARA BUSCAR O HISTÓRICO:
-  /// Busca o histórico de movimentações de estoque, com filtro opcional por medicamento.
-  Future<List<StockHistory>> getStockHistory({int? medicationId}) async {
+  /// Busca o histórico de movimentações de estoque, com filtros opcionais.
+  Future<List<StockHistory>> getStockHistory({
+    int? medicationId,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
     final db = await _dbController.database;
     final profileId = ProfileHelper.currentProfileId;
 
-    // Usamos uma query com JOIN para buscar o nome do medicamento junto com o histórico
+    // Query base com JOIN para buscar o nome do medicamento
     String query = '''
-    SELECT h.*, m.nome as nomeMedicamento 
-    FROM tblEstoqueMedicamento h
-    JOIN tblMedicamentos m ON h.idMedicamento = m.id
-    WHERE h.deletado = 0 AND h.idPerfil = ?
-  ''';
+      SELECT h.*, m.nome as nomeMedicamento
+      FROM tblEstoqueMedicamento h
+      JOIN tblMedicamentos m ON h.idMedicamento = m.id
+      WHERE h.deletado = 0 AND h.idPerfil = ?
+    ''';
 
     List<dynamic> args = [profileId];
 
+    // Adiciona filtro por ID do medicamento, se fornecido
     if (medicationId != null) {
       query += ' AND h.idMedicamento = ?';
       args.add(medicationId);
+    }
+
+    // Adiciona filtro por data de início
+    if (startDate != null) {
+      // Pega o início do dia para garantir que todos os registros do dia sejam incluídos
+      final startOfDay = DateTime(
+        startDate.year,
+        startDate.month,
+        startDate.day,
+      );
+      query += ' AND h.dataCriacao >= ?';
+      args.add(startOfDay.toIso8601String());
+    }
+
+    // Adiciona filtro por data de fim
+    if (endDate != null) {
+      // Pega o final do dia (23:59:59) para incluir todos os registros do dia
+      final endOfDay = DateTime(
+        endDate.year,
+        endDate.month,
+        endDate.day,
+        23,
+        59,
+        59,
+      );
+      query += ' AND h.dataCriacao <= ?';
+      args.add(endOfDay.toIso8601String());
     }
 
     query += ' ORDER BY h.dataCriacao DESC';
@@ -352,7 +397,7 @@ class MedicationController extends GetxController {
     }
 
     // Calcula o novo estoque (restaura)
-    final newStock = medication.estoque + doseAmount.toInt();
+    final newStock = medication.estoque + doseAmount;
 
     // Atualiza o estoque no banco
     await db.update(

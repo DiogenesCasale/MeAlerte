@@ -73,15 +73,21 @@ class NotificationController extends GetxController {
     required String? horarioAgendado,
     required String titulo,
     required String mensagem,
+    int? idPerfil,
   }) async {
     try {
       final db = await _dbController.database;
       final profileController = Get.find<ProfileController>();
 
-      if (profileController.currentProfile.value == null) return null;
+      if (idPerfil == null) {
+        if (profileController.currentProfile.value == null) {
+          return null;
+        }
+        idPerfil = profileController.currentProfile.value!.id;
+      }
 
       int newId = await db.insert('tblNotificacoes', {
-        'idPerfil': profileController.currentProfile.value!.id,
+        'idPerfil': idPerfil,
         'idAgendamento': idAgendamento,
         'horarioAgendado': horarioAgendado,
         'titulo': titulo,

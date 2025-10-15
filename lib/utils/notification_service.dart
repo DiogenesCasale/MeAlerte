@@ -82,6 +82,8 @@ class NotificationService {
     if (response.payload != null && response.payload!.isNotEmpty) {
       try {
         final Map<String, dynamic> data = jsonDecode(response.payload!);
+        final _profileController = Get.find<ProfileController>();
+        final Profile? profile = await _profileController.getProfileById(data['idPerfil']);
 
         // 1. Salva a notificação no banco e pega o ID recém-criado.
         final int? newNotificationId = await _notificationController
@@ -90,6 +92,7 @@ class NotificationService {
               horarioAgendado: data['horarioAgendado'],
               titulo: data['titulo'],
               mensagem: data['mensagem'],
+              idPerfil: data['idPerfil'],
             );
 
         // 2. Se o salvamento foi bem-sucedido, imediatamente marca como lida.
@@ -98,6 +101,8 @@ class NotificationService {
             '✅ Notificação salva com ID $newNotificationId. Marcando como lida...',
           );
           await _notificationController.markAsRead(newNotificationId);
+          await _profileController.setCurrentProfile(profile!);
+
         } else {
           print(
             '⚠️ Falha ao salvar a notificação, não foi possível marcar como lida.',
@@ -180,7 +185,9 @@ class NotificationService {
     await _createNotificationChannel(soundUri: newSoundUri);
     final schedulesController = Get.find<SchedulesController>();
     await schedulesController.rescheduleAllNotifications();
-    print('✅ Canal de notificação recriado com novo som e todas as notificações reagendadas');
+    print(
+      '✅ Canal de notificação recriado com novo som e todas as notificações reagendadas',
+    );
   }
 
   // <--- MÉTODO PRIVADO MODIFICADO --->
@@ -256,6 +263,7 @@ class NotificationService {
                 'Olá, ${profile?.nome ?? 'Usuário'}! Está na hora de tomar seu medicamento! Tomar ${dose.medicationName} (${dose.dose}) às ${DateFormat('HH:mm').format(dose.scheduledTime)}.',
             scheduledDate: tz.TZDateTime.from(scheduledTimeBefore, tz.local),
             idAgendamento: dose.scheduledMedicationId,
+            idPerfil: dose.idPerfil,
           );
           print(
             '⏰ Notificação de lembrete agendada para: ${DateFormat('dd/MM/yyyy HH:mm').format(scheduledTimeBefore)}',
@@ -279,6 +287,7 @@ class NotificationService {
                 'Olá, ${profile?.nome ?? 'Usuário'}! Você já tomou seu ${dose.medicationName} das ${DateFormat('HH:mm').format(dose.scheduledTime)}?',
             scheduledDate: tz.TZDateTime.from(scheduledTimeAfter, tz.local),
             idAgendamento: dose.scheduledMedicationId,
+            idPerfil: dose.idPerfil,
           );
           print(
             '⏰ Notificação de atraso agendada para: ${DateFormat('dd/MM/yyyy HH:mm').format(scheduledTimeAfter)}',
@@ -296,6 +305,7 @@ class NotificationService {
     required String body,
     required tz.TZDateTime scheduledDate,
     int? idAgendamento,
+    int? idPerfil,
   }) async {
     try {
       final settings = Get.find<SettingsController>();
@@ -366,7 +376,9 @@ class NotificationService {
         'horarioAgendado': DateFormat('HH:mm').format(scheduledDate),
         'titulo': title,
         'mensagem': body,
+        'idPerfil': idPerfil,
       };
+
       // Convertemos o mapa para uma string JSON.
       final String payloadString = jsonEncode(payloadMap);
 
@@ -448,7 +460,9 @@ class NotificationService {
         iosSound = 'default.wav';
       }
 
-      final channelId = _getChannelIdForSound(settings.notificationSoundUri.value);
+      final channelId = _getChannelIdForSound(
+        settings.notificationSoundUri.value,
+      );
       final AndroidNotificationDetails androidDetails =
           AndroidNotificationDetails(
             channelId,

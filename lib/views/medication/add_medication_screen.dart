@@ -122,7 +122,7 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
     try {
       final newMedication = Medication(
         nome: _nameController.text.trim(),
-        estoque: int.parse(_stockController.text.trim()),
+        estoque: double.parse(_stockController.text.trim()),
         observacao: _observacaoController.text.trim().isEmpty 
           ? null 
           : _observacaoController.text.trim(),

@@ -212,9 +212,13 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
           TextButton(
             onPressed: () async {
               try {
+                final doseText = _doseController.text.trim().replaceAll(
+                  ',',
+                  '.',
+                );
                 await schedulesController.updateSpecificDose(
                   widget.dose,
-                  newDose: double.parse(_doseController.text.trim()),
+                  newDose: double.parse(doseText),
                   newObservacao: _observacaoController.text.trim().isEmpty
                       ? null
                       : _observacaoController.text.trim(),
@@ -288,11 +292,12 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
 
   Future<void> _performActualUpdate() async {
     try {
+      final doseText = _doseController.text.trim().replaceAll(',', '.');
       final updatedMedication = ScheduledMedication(
         id: _scheduledMedication!.id,
         hora:
             '${_selectedTime.hour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')}',
-        dose: double.parse(_doseController.text.trim()),
+        dose: double.parse(doseText),
         intervalo: int.parse(_intervalController.text.trim()),
         dias: 0, // Campo antigo, não mais utilizado
         observacao: _observacaoController.text.trim().isEmpty
@@ -718,8 +723,13 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
             keyboardType: TextInputType.numberWithOptions(decimal: true),
             validator: (v) {
               if (v == null || v.trim().isEmpty) return 'Dose obrigatória';
-              final dose = double.tryParse(v.trim());
-              if (dose == null || dose <= 0) return 'Dose deve ser > 0';
+
+              // >>> MODIFICAÇÃO AQUI <<<
+              // Substitui a vírgula por ponto para a validação
+              final doseValue = v.trim().replaceAll(',', '.');
+              final dose = double.tryParse(doseValue);
+
+              if (dose == null || dose <= 0) return 'Dose inválida';
               return null;
             },
           ),

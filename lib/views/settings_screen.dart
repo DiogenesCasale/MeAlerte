@@ -262,16 +262,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Column(
                   children: [
                     if (areOptionsVisible) ...[
-                      const Divider(height: 1, indent: 16, endIndent: 16),
-                      _buildSettingsRow(
-                        icon: Icons.vibration,
-                        title: 'Vibrar',
-                        trailing: Switch(
-                          value: settingsController.vibrateEnabled.value,
-                          onChanged: settingsController.setVibrate,
-                          activeColor: primaryColor,
-                        ),
-                      ),
+                      // Está sempre true no channelNotification, se necessário esse controle, deve-se recriar o canal sempre q essa opção for modificada
+                      // const Divider(height: 1, indent: 16, endIndent: 16),
+                      // _buildSettingsRow(
+                      //   icon: Icons.vibration,
+                      //   title: 'Vibrar',
+                      //   trailing: Switch(
+                      //     value: settingsController.vibrateEnabled.value,
+                      //     onChanged: settingsController.setVibrate,
+                      //     activeColor: primaryColor,
+                      //   ),
+                      // ),
                       const Divider(height: 1, indent: 16, endIndent: 16),
                       _buildSettingsRow(
                         icon: Icons.music_note,

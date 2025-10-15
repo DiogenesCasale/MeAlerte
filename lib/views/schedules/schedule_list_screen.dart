@@ -149,7 +149,7 @@ class ScheduleListScreen extends GetView<SchedulesController> {
           ActionButtonModel(
             onPressed: () => Get.to(() => const AddRestockScreen()),
             icon: Icon(Icons.add, color: Colors.white),
-            label: 'Nova Reposição',
+            label: 'Nova Reposição/Saída',
             backgroundColor: primaryColor,
           ),
         ],
@@ -505,7 +505,6 @@ class ScheduleListScreen extends GetView<SchedulesController> {
 
                   const SizedBox(height: 16),
 
-                  // Botões de ação (seu código existente)
                   OutlinedButton.icon(
                     icon: Icon(
                       dose.status == MedicationStatus.taken
@@ -745,7 +744,7 @@ class ScheduleListScreen extends GetView<SchedulesController> {
                           child: Text(
                             dose.status.displayName,
                             style: TextStyle(
-                              fontSize: 9, // Era 10.0
+                              fontSize: 12, // Era 10.0
                               color: statusColor,
                               fontWeight: FontWeight.w600,
                             ),
@@ -918,10 +917,10 @@ class ScheduleListScreen extends GetView<SchedulesController> {
             ),
             const SizedBox(height: 24),
             OutlinedButton.icon(
-              icon: const Icon(Icons.copy, color: Colors.white),
-              label: const Text(
+              icon: Icon(Icons.copy, color: backgroundColor),
+              label: Text(
                 'Copiar Mensagem',
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(color: backgroundColor),
               ),
               style: OutlinedButton.styleFrom(
                 backgroundColor: primaryColor,
@@ -961,13 +960,13 @@ class ScheduleListScreen extends GetView<SchedulesController> {
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(
-              icon: const Icon(
+              icon: Icon(
                 Icons.chat_bubble_outline,
-                color: Colors.white,
+                color: backgroundColor,
               ), // Ícone do WhatsApp
-              label: const Text(
+              label: Text(
                 'Enviar pelo WhatsApp',
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(color: backgroundColor),
               ),
               style: OutlinedButton.styleFrom(
                 backgroundColor: const Color(0xFF25D366), // Cor do WhatsApp

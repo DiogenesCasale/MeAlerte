@@ -163,7 +163,7 @@ class _EditMedicationScreenState extends State<EditMedicationScreen> {
       final updatedMedication = Medication(
         id: widget.medication.id,
         nome: _nameController.text.trim(),
-        estoque: int.parse(_stockController.text.trim()),
+        estoque: double.parse(_stockController.text.trim()),
         observacao: _observacaoController.text.trim().isEmpty
             ? null
             : _observacaoController.text.trim(),

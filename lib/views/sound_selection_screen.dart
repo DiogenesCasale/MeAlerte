@@ -1,5 +1,6 @@
 // lib/screens/sound_selection_screen.dart
 
+import 'package:app_remedio/utils/toast_service.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart'; // Usado para navegação e cores
 import 'package:jbh_ringtone/jbh_ringtone.dart';
@@ -34,7 +35,7 @@ class _SoundSelectionScreenState extends State<SoundSelectionScreen> {
   // Busca os sons do tipo 'notificação'
   Future<void> _fetchNotificationSounds() async {
     try {
-      final sounds = await _jbhRingtone.getAllRingtones();
+      final sounds = await _jbhRingtone.getNotificationRingtones();
       if (mounted) {
         setState(() {
           notificationSounds = sounds;
@@ -47,11 +48,9 @@ class _SoundSelectionScreenState extends State<SoundSelectionScreen> {
         setState(() {
           isLoading = false;
         });
-        Get.snackbar(
-          'Erro',
+        ToastService.showError(
+          context,
           'Não foi possível carregar os sons de notificação.',
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
         );
       }
     }

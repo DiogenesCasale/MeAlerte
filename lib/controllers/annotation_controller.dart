@@ -1,3 +1,4 @@
+import 'package:app_remedio/utils/toast_service.dart';
 import 'package:get/get.dart';
 import 'package:app_remedio/controllers/database_controller.dart';
 import 'package:app_remedio/controllers/profile_controller.dart';
@@ -10,6 +11,9 @@ class AnnotationController extends GetxController {
   final RxList<Annotation> annotationsList = <Annotation>[].obs;
   final RxBool isLoading = false.obs;
 
+  final Rxn<DateTime> startDate = Rxn<DateTime>();
+  final Rxn<DateTime> endDate = Rxn<DateTime>();
+
   @override
   void onInit() {
     super.onInit();
@@ -18,27 +22,72 @@ class AnnotationController extends GetxController {
     loadAnnotations();
   }
 
+  void setDateFilter(DateTime newStartDate, DateTime newEndDate) {
+    startDate.value = newStartDate;
+    endDate.value = newEndDate;
+    loadAnnotations(); // Recarrega os dados com o novo filtro
+  }
+
   Future<void> loadAnnotations() async {
     final currentProfile = _profileController.currentProfile.value;
     if (currentProfile?.id == null) {
-      annotationsList.clear(); // Limpa a lista se não houver perfil
+      annotationsList.clear();
       return;
     }
 
     try {
       isLoading.value = true;
       final db = await _dbController.database;
+
+      // Constrói a query e os argumentos dinamicamente
+      String whereClause = 'deletado = 0 AND idPerfil = ?';
+      List<dynamic> whereArgs = [currentProfile!.id];
+
+      // Adiciona o filtro de data de início, se existir
+      if (startDate.value != null) {
+        // Pega o início do dia para a consulta
+        final startOfDay = DateTime(
+          startDate.value!.year,
+          startDate.value!.month,
+          startDate.value!.day,
+        );
+        whereClause += ' AND dataCriacao >= ?';
+        whereArgs.add(startOfDay.toIso8601String());
+      }
+
+      // Adiciona o filtro de data de fim, se existir
+      if (endDate.value != null) {
+        // Pega o final do dia para incluir todos os registros da data final
+        final endOfDay = DateTime(
+          endDate.value!.year,
+          endDate.value!.month,
+          endDate.value!.day,
+          23,
+          59,
+          59,
+        );
+        whereClause += ' AND dataCriacao <= ?';
+        whereArgs.add(endOfDay.toIso8601String());
+      }
+
       final result = await db.query(
         'tblAnotacoes',
         orderBy: 'dataCriacao DESC',
-        where: 'deletado = 0 AND idPerfil = ?',
-        whereArgs: [currentProfile!.id],
+        where: whereClause, // Usa a cláusula WHERE dinâmica
+        whereArgs: whereArgs, // Usa os argumentos dinâmicos
       );
+
       final anotacoes = result.map((json) => Annotation.fromMap(json)).toList();
       annotationsList.assignAll(anotacoes);
     } catch (e) {
       print('Erro ao carregar anotações: $e');
-      Get.snackbar('Erro', 'Não foi possível carregar as anotações.');
+      final context = Get.overlayContext;
+      if (context != null) {
+        ToastService.showError(
+          context,
+          'Não foi possível carregar as anotações.',
+        );
+      }
     } finally {
       isLoading.value = false;
     }
@@ -65,9 +114,9 @@ class AnnotationController extends GetxController {
       return false;
     }
   }
-  
+
   Future<bool> updateAnnotation(Annotation anotacao) async {
-     try {
+    try {
       final db = await _dbController.database;
       await db.update(
         'tblAnotacoes',
@@ -102,6 +151,4 @@ class AnnotationController extends GetxController {
       return false;
     }
   }
-
-  
 }

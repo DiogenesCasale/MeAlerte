@@ -18,7 +18,7 @@ enum MedicationType {
 class Medication {
   final int? id;
   final String nome;
-  final int estoque;
+  final double estoque;
   final MedicationType tipo;
   final bool deletado;
   final int idPerfil;

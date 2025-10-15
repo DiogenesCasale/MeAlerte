@@ -175,7 +175,7 @@ class MedicationListScreen extends GetView<MedicationController> {
           ActionButtonModel(
             onPressed: () => Get.to(() => const AddRestockScreen()),
             icon: Icon(Icons.add, color: Colors.white),
-            label: 'Nova Reposição',
+            label: 'Nova Reposição/Saída',
             backgroundColor: primaryColor,
           ),
         ],
