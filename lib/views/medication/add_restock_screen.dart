@@ -147,7 +147,6 @@ class _AddRestockScreenState extends State<AddRestockScreen> {
                 style: TextStyle(color: textColor),
                 decoration: _inputDecoration(
                   hint: 'Ex: 30 ou -10',
-                  suffixText: _selectedMedication?.tipo.unit ?? 'unidades',
                 ),
                 // >>> MODIFICAÇÃO AQUI <<<
                 // Validador para garantir que é um número inteiro e não é zero.

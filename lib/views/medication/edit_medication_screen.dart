@@ -337,7 +337,6 @@ class _EditMedicationScreenState extends State<EditMedicationScreen> {
             label: 'Estoque *',
             hint: 'Ex: 30',
             keyboardType: TextInputType.number,
-            suffixText: _selectedType.unit,
             validator: (v) {
               if (v == null || v.trim().isEmpty) return 'Obrigatório';
               final stock = int.tryParse(v);
