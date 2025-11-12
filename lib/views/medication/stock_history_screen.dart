@@ -448,8 +448,8 @@ class _StockHistoryScreenState extends State<StockHistoryScreen> {
     // Formata a quantidade para remover o ".0" se for um número inteiro
     final formattedQuantity = item.quantity == item.quantity.truncate()
         ? item.quantity.truncate().toString()
-        : item.quantity.toString();
-    final prefix = isEntry ? '+' : ''; // O sinal de menos já vem com o número
+        : item.quantity.toString().replaceAll('.', ',');
+    final prefix = isEntry ? '+' : item.quantity < 0 ? '' : '-';
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6),

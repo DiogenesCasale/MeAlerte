@@ -158,12 +158,12 @@ class _EditMedicationScreenState extends State<EditMedicationScreen> {
       ToastService.showError(context, 'É necessário selecionar um perfil primeiro.');
       return;
     }
-
+    final stockText = _stockController.text.trim().replaceAll(',', '.');
     try {
       final updatedMedication = Medication(
         id: widget.medication.id,
         nome: _nameController.text.trim(),
-        estoque: double.parse(_stockController.text.trim()),
+        estoque: double.parse(stockText),
         observacao: _observacaoController.text.trim().isEmpty
             ? null
             : _observacaoController.text.trim(),
@@ -339,7 +339,8 @@ class _EditMedicationScreenState extends State<EditMedicationScreen> {
             keyboardType: TextInputType.number,
             validator: (v) {
               if (v == null || v.trim().isEmpty) return 'Obrigatório';
-              final stock = int.tryParse(v);
+              final stockValue = v.trim().replaceAll(',', '.');
+              final stock = double.tryParse(stockValue);
               if (stock == null || stock < 0) return 'Inválido';
               return null;
             },

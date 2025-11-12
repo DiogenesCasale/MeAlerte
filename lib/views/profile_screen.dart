@@ -10,6 +10,7 @@ import 'package:app_remedio/views/health_data/health_data_list_screen.dart';
 import 'package:app_remedio/utils/toast_service.dart';
 import 'package:app_remedio/views/medication/stock_history_screen.dart';
 import 'package:app_remedio/views/annotation/annotation_list_screen.dart';
+import 'package:app_remedio/views/backup/backup_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   final bool showBackButton;
@@ -165,6 +166,13 @@ class ProfileScreen extends StatelessWidget {
             _buildSectionHeader('Configurações'),
             const SizedBox(height: 12),
             _buildSettingsSection(),
+
+            const SizedBox(height: 24),
+
+            // Seção Backup
+            _buildSectionHeader('Backup'),
+            const SizedBox(height: 12),
+            _buildBackupSection(),
           ],
         ),
       ),
@@ -275,7 +283,9 @@ class ProfileScreen extends StatelessWidget {
             onTap: currentProfile != null
                 ? () {
                     // Apenas navegue. O controller agora gerencia 100% da atualização.
-                    Get.to(() => EditProfileScreen(profileInitial: currentProfile));
+                    Get.to(
+                      () => EditProfileScreen(profileInitial: currentProfile),
+                    );
                   }
                 : null,
           ),
@@ -366,6 +376,32 @@ class ProfileScreen extends StatelessWidget {
             title: 'Configurações do App',
             subtitle: 'Tema, notificações e preferências',
             onTap: () => Get.to(() => const SettingsScreen()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBackupSection() {
+    return Container(
+      decoration: BoxDecoration(
+        color: surfaceColor,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          _buildSettingsTile(
+            icon: Icons.backup,
+            title: 'Backup',
+            subtitle: 'Backup e restauração dos dados',
+            onTap: () => Get.to(() => const BackupScreen()),
           ),
         ],
       ),

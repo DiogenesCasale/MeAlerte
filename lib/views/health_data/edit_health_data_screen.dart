@@ -567,11 +567,11 @@ class _EditHealthDataScreenState extends State<EditHealthDataScreen> {
       );
 
       if (success) {
+        Get.back();
         ToastService.showSuccess(
           context,
           'Dados de saúde atualizados com sucesso',
         );
-        Get.back();
       } else {
         ToastService.showError(context, 'Erro ao atualizar dados de saúde');
       }

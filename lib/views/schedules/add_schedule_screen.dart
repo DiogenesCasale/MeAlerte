@@ -581,8 +581,8 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
           return 'Intervalo é obrigatório';
         }
         final interval = int.tryParse(v);
-        if (interval == null || interval <= 0) {
-          return 'Intervalo deve ser > 0';
+        if (interval == null || interval <= 0 || interval % 1 != 0) {
+          return 'Deve ser um número inteiro maior que 0';
         }
         return null;
       },

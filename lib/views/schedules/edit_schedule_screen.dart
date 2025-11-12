@@ -423,8 +423,10 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
                         return 'Intervalo é obrigatório';
                       }
                       final interval = int.tryParse(v);
-                      if (interval == null) {
-                        return 'Intervalo deve ser um número válido';
+                      if (interval == null ||
+                          interval < 0 ||
+                          interval % 1 != 0) {
+                        return 'Deve ser um número inteiro maior que 0';
                       }
                       return null;
                     },

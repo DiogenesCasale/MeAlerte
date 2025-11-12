@@ -1,7 +1,7 @@
 name: app_remedio
 description: "A new Flutter project."
 publish_to: 'none'
-version: 0.3.3
+version: 0.4.0
 
 environment:
   sdk: ^3.9.0
@@ -29,6 +29,7 @@ dependencies:
   permission_handler: ^11.3.1 # Para solicitar permissões em tempo de execução
   jbh_ringtone: ^1.0.3 # Para tocar toques personalizados nas notificações
   device_info_plus: ^10.1.2 # Para obter informações do dispositivo
+  file_picker: ^8.0.7 # Para selecionar arquivos de backup
 
 
 dev_dependencies:

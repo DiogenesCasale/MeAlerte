@@ -279,7 +279,7 @@ class MedicationListScreen extends GetView<MedicationController> {
         ),
       );
     }
-
+    String stockText = medication.estoque.toString().replaceAll('.', ',');
     // ALTERADO: O corpo do widget agora usa o `leadingWidget` que criamos
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4.0),
@@ -310,8 +310,9 @@ class MedicationListScreen extends GetView<MedicationController> {
                       ),
                     ),
                     const SizedBox(height: 4),
+         
                     Text(
-                      'Estoque: ${medication.estoque} ${medication.tipo.unit}',
+                      'Estoque: $stockText ${medication.tipo.unit}',
                       style: TextStyle(
                         fontSize: 14,
                         color: medication.estoque > 10
