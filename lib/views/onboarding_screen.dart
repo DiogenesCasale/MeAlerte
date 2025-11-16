@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:app_remedio/utils/constants.dart';
 import 'package:app_remedio/views/profile/add_profile_screen.dart';
+import 'package:app_remedio/controllers/backup_controller.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -13,6 +14,13 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
+  final BackupController _backupController = Get.put(BackupController());
+
+  // Função para restaurar backup e navegar
+  Future<void> _handleRestoreBackup() async {
+    // O BackupController já cuida de reiniciar o app após restaurar
+    await _backupController.importBackup();
+  }
 
   // Lista de slides da apresentação
   final List<Widget> _onboardingPages = [
@@ -62,40 +70,82 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 (index) => buildDot(index: index),
               ),
             ),
-            // Botão de ação
+            // Botões de ação
             Padding(
               padding: const EdgeInsets.all(24.0),
-              child: ElevatedButton(
-                onPressed: () {
-                  // Se não for a última página, avança
-                  if (_currentPage < _onboardingPages.length - 1) {
-                    _pageController.nextPage(
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.ease,
-                    );
-                  } else {
-                    // Se for a última página, vai para a criação de perfil
-                    Get.off(() => const AddProfileScreen());
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryColor,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              child: Column(
+                children: [
+                  // Botão de Restaurar Backup (apenas na última página)
+                  if (_currentPage == _onboardingPages.length - 1)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12.0),
+                      child: Obx(
+                        () => OutlinedButton.icon(
+                          onPressed: _backupController.isLoading.value
+                              ? null
+                              : _handleRestoreBackup,
+                          icon: _backupController.isLoading.value
+                              ? SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: primaryColor,
+                                  ),
+                                )
+                              : Icon(Icons.restore, color: primaryColor),
+                          label: Text(
+                            'Restaurar Backup',
+                            style: TextStyle(
+                              color: primaryColor,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: primaryColor, width: 2),
+                            minimumSize: const Size(double.infinity, 50),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  // Botão principal (Próximo ou Vamos Começar)
+                  ElevatedButton(
+                    onPressed: () {
+                      // Se não for a última página, avança
+                      if (_currentPage < _onboardingPages.length - 1) {
+                        _pageController.nextPage(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.ease,
+                        );
+                      } else {
+                        // Se for a última página, vai para a criação de perfil
+                        Get.off(() => const AddProfileScreen());
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(double.infinity, 50),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    // O texto do botão muda na última página
+                    child: Text(
+                      _currentPage == _onboardingPages.length - 1
+                          ? 'Vamos Começar'
+                          : 'Próximo',
+                    ),
                   ),
-                  textStyle: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                // O texto do botão muda na última página
-                child: Text(
-                  _currentPage == _onboardingPages.length - 1
-                      ? 'Vamos Começar'
-                      : 'Próximo',
-                ),
+                ],
               ),
             ),
           ],

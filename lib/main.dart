@@ -185,8 +185,34 @@ class _SplashScreenState extends State<SplashScreen>
     // Dê um tempo mínimo para a splash screen ser exibida
     await Future.delayed(const Duration(seconds: 3));
 
-    // Pega a instância do ProfileController
-    final profileController = Get.find<ProfileController>();
+    // Aguarda o ProfileController estar disponível (pode ter sido recriado após backup/restore)
+    ProfileController? profileController;
+    int attempts = 0;
+    while (profileController == null && attempts < 20) {
+      try {
+        profileController = Get.find<ProfileController>();
+      } catch (e) {
+        print('Aguardando ProfileController... tentativa ${attempts + 1}');
+        await Future.delayed(const Duration(milliseconds: 200));
+        attempts++;
+      }
+    }
+
+    if (profileController == null) {
+      print('ERRO: ProfileController não encontrado após aguardar');
+      // Fallback: vai para onboarding
+      Get.off(() => const OnboardingScreen(),
+          transition: Transition.fadeIn,
+          duration: const Duration(milliseconds: 500));
+      return;
+    }
+
+    // Aguarda o controller terminar de carregar
+    int loadingAttempts = 0;
+    while (profileController.isLoading.value && loadingAttempts < 30) {
+      await Future.delayed(const Duration(milliseconds: 100));
+      loadingAttempts++;
+    }
 
     // Acessa a lista de perfis. O Obx na ProfileListScreen já mostra 
     // que o controller carrega a lista no onInit.

@@ -11,6 +11,7 @@ import 'package:app_remedio/utils/toast_service.dart';
 import 'package:app_remedio/views/medication/stock_history_screen.dart';
 import 'package:app_remedio/views/annotation/annotation_list_screen.dart';
 import 'package:app_remedio/views/backup/backup_screen.dart';
+import 'package:app_remedio/views/reports/doses_report_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   final bool showBackButton;
@@ -335,7 +336,7 @@ class ProfileScreen extends StatelessWidget {
             icon: Icons.analytics,
             title: 'Relatórios',
             subtitle: 'Relatórios de medicamentos e aderência',
-            onTap: () => _showFeatureInDevelopment('Relatórios', context),
+            onTap: () => Get.to(() => const DosesReportScreen()),
           ),
           _buildDivider(),
           _buildSettingsTile(
@@ -453,10 +454,4 @@ class ProfileScreen extends StatelessWidget {
     return Divider(height: 1, color: Colors.grey.withOpacity(0.2), indent: 60);
   }
 
-  void _showFeatureInDevelopment(String featureName, BuildContext context) {
-    ToastService.showInfo(
-      context,
-      '$featureName está em desenvolvimento. Esta funcionalidade estará disponível em uma próxima versão do aplicativo.',
-    );
-  }
 }

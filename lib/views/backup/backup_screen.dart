@@ -131,15 +131,6 @@ class BackupScreen extends StatelessWidget {
             onTap: () => controller.exportBackup(),
             controller: controller,
           ),
-          _buildDivider(),
-          _buildActionTile(
-            icon: Icons.restore,
-            iconColor: Colors.blue,
-            title: 'Restaurar Backup',
-            subtitle: 'Importa dados de um arquivo de backup',
-            onTap: () => controller.importBackup(),
-            controller: controller,
-          ),
         ],
       ),
     );
@@ -229,12 +220,5 @@ class BackupScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDivider() {
-    return Divider(
-      height: 1,
-      color: Colors.grey.withOpacity(0.2),
-      indent: 88,
-    );
-  }
 }
 

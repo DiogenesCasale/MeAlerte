@@ -11,6 +11,13 @@ import 'package:app_remedio/utils/toast_service.dart';
 import 'package:intl/intl.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:app_remedio/controllers/profile_controller.dart';
+import 'package:app_remedio/controllers/medication_controller.dart';
+import 'package:app_remedio/controllers/schedules_controller.dart';
+import 'package:app_remedio/controllers/health_data_controller.dart';
+import 'package:app_remedio/controllers/notification_controller.dart';
+import 'package:app_remedio/controllers/settings_controller.dart';
+import 'package:app_remedio/utils/notification_service.dart';
+import 'package:app_remedio/main.dart' show SplashScreen;
 import 'package:sqflite/sqflite.dart'; // Para openDatabase
 import 'package:path/path.dart'; // Para join
 
@@ -18,6 +25,64 @@ class BackupController extends GetxController {
   final DatabaseController _dbController = DatabaseController.instance;
   final LocalAuthentication _localAuth = LocalAuthentication();
   final RxBool isLoading = false.obs;
+
+  /// Reinicia o app completamente, seguindo a ordem correta do main.dart
+  Future<void> _restartApp() async {
+    try {
+      print('Iniciando reinicialização do app...');
+      
+      // 1. Fecha o banco de dados primeiro
+      try {
+        await _dbController.close();
+        print('Banco de dados fechado.');
+      } catch (e) {
+        print('Erro ao fechar banco: $e');
+      }
+      
+      // 2. Deleta todos os controllers na ordem inversa
+      Get.delete<HealthDataController>(force: true);
+      Get.delete<SchedulesController>(force: true);
+      Get.delete<MedicationController>(force: true);
+      Get.delete<SettingsController>(force: true);
+      Get.delete<NotificationController>(force: true);
+      Get.delete<ProfileController>(force: true);
+      Get.delete<BackupController>(force: true); // Deleta ele mesmo
+      // ThemeController e GlobalStateController não devem ser deletados
+      
+      print('Controllers deletados.');
+      
+      // 3. Aguarda um pouco para garantir que tudo foi limpo
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // 4. Recria os controllers na ORDEM CORRETA (mesma do main.dart) COM permanent: true
+      // GlobalStateController e ThemeController já existem, não recriar
+      Get.put(ProfileController(), permanent: true);
+      Get.put(NotificationController(), permanent: true);
+      Get.put(SettingsController(), permanent: true);
+      
+      await NotificationService().init();
+      
+      Get.put(MedicationController(), permanent: true);
+      Get.put(SchedulesController(), permanent: true);
+      Get.put(HealthDataController(), permanent: true);
+      
+      print('Controllers recriados na ordem correta com permanent: true.');
+      
+      // 5. Aguarda mais um pouco para os controllers inicializarem
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // 6. AGORA navega para a SplashScreen usando offAllNamed para limpar a pilha
+      // mas os controllers permanent não serão deletados
+      Get.offAll(() => const SplashScreen(), 
+        transition: Transition.fadeIn,
+        predicate: (route) => false, // Remove todas as rotas
+      );
+      
+      print('App reiniciado com sucesso!');
+    } catch (e) {
+      print('Erro ao reiniciar app: $e');
+    }
+  }
 
   /// Exporta todos os dados do banco para um arquivo JSON
   Future<bool> exportBackup() async {
@@ -222,8 +287,14 @@ class BackupController extends GetxController {
 
       final context = Get.overlayContext;
       if (context != null) {
-        ToastService.showSuccess(context, 'Backup restaurado com sucesso!');
+        ToastService.showSuccess(context, 'Backup restaurado com sucesso! Reiniciando app...');
       }
+
+      // Aguarda um pouco para o toast ser exibido
+      await Future.delayed(const Duration(milliseconds: 1500));
+
+      // Reinicia o app
+      await _restartApp();
 
       return true;
     } catch (e) {
@@ -368,21 +439,15 @@ class BackupController extends GetxController {
       if (context != null) {
         ToastService.showSuccess(
           context,
-          'Todos os dados foram apagados com sucesso!',
+          'Todos os dados foram apagados! Reiniciando app...',
         );
       }
 
-      // 5. ATUALIZA O ESTADO DO APP (ESSENCIAL)
-      try {
-        // Pede ao ProfileController para recarregar
-        // Ele vai usar a conexão singleton (que está travada)
-        // mas o "SELECT" dele vai ler os dados que acabamos de apagar.
-        final profileController = Get.find<ProfileController>();
-        await profileController.refresh();
-        print('ProfileController recarregado para limpar a UI.');
-      } catch (e) {
-        print('Erro ao tentar encontrar e recarregar ProfileController: $e');
-      }
+      // Aguarda um pouco para o toast ser exibido
+      await Future.delayed(const Duration(milliseconds: 1500));
+
+      // Reinicia o app
+      await _restartApp();
 
       return true;
     } catch (e) {

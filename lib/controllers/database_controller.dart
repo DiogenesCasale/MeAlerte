@@ -14,6 +14,15 @@ class DatabaseController {
     return _database!;
   }
 
+  // --- Método para fechar o banco de dados ---
+  Future<void> close() async {
+    if (_database != null) {
+      await _database!.close();
+      _database = null;
+      print('Banco de dados fechado e resetado.');
+    }
+  }
+
   // --- Inicialização e criação das tabelas ---
   Future<Database> _initDB(String filePath) async {
     final dbPath = await getDatabasesPath();
