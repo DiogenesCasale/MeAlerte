@@ -7,7 +7,6 @@ import 'package:app_remedio/views/profile/profile_list_screen.dart';
 import 'package:app_remedio/views/profile/edit_profile_screen.dart';
 import 'package:app_remedio/views/settings_screen.dart';
 import 'package:app_remedio/views/health_data/health_data_list_screen.dart';
-import 'package:app_remedio/utils/toast_service.dart';
 import 'package:app_remedio/views/medication/stock_history_screen.dart';
 import 'package:app_remedio/views/annotation/annotation_list_screen.dart';
 import 'package:app_remedio/views/backup/backup_screen.dart';

@@ -27,63 +27,67 @@ class DosesReportScreen extends StatelessWidget {
           // Filtros de período
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: Obx(() => SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _buildPeriodChip(
-                        'Última Semana',
-                        ReportPeriod.lastWeek,
-                        reportController,
-                      ),
-                      _buildPeriodChip(
-                        'Último Mês',
-                        ReportPeriod.lastMonth,
-                        reportController,
-                      ),
-                      _buildPeriodChip(
-                        'Últimos 3 Meses',
-                        ReportPeriod.last3Months,
-                        reportController,
-                      ),
-                    ],
-                  ),
-                )),
+            child: Obx(
+              () => SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _buildPeriodChip(
+                      'Última Semana',
+                      ReportPeriod.lastWeek,
+                      reportController,
+                    ),
+                    _buildPeriodChip(
+                      'Último Mês',
+                      ReportPeriod.lastMonth,
+                      reportController,
+                    ),
+                    _buildPeriodChip(
+                      'Últimos 3 Meses',
+                      ReportPeriod.last3Months,
+                      reportController,
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
 
           // Seletor de datas personalizado
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _buildDateButton(
-                    context,
-                    'De:',
-                    reportController.startDate.value,
-                    (date) {
-                      reportController.setCustomPeriod(
-                        date,
-                        reportController.endDate.value,
-                      );
-                    },
+            child: Obx(
+              () => Row(
+                children: [
+                  Expanded(
+                    child: _buildDateButton(
+                      context,
+                      'De:',
+                      reportController.startDate.value,
+                      (date) {
+                        reportController.setCustomPeriod(
+                          date,
+                          reportController.endDate.value,
+                        );
+                      },
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildDateButton(
-                    context,
-                    'Até:',
-                    reportController.endDate.value,
-                    (date) {
-                      reportController.setCustomPeriod(
-                        reportController.startDate.value,
-                        date,
-                      );
-                    },
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildDateButton(
+                      context,
+                      'Até:',
+                      reportController.endDate.value,
+                      (date) {
+                        reportController.setCustomPeriod(
+                          reportController.startDate.value,
+                          date,
+                        );
+                      },
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
 
@@ -145,7 +149,8 @@ class DosesReportScreen extends StatelessWidget {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: _getAdherenceGradient(
-                            reportController.adherenceRate.value),
+                          reportController.adherenceRate.value,
+                        ),
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -153,8 +158,8 @@ class DosesReportScreen extends StatelessWidget {
                       boxShadow: [
                         BoxShadow(
                           color: _getAdherenceColor(
-                                  reportController.adherenceRate.value)
-                              .withOpacity(0.4),
+                            reportController.adherenceRate.value,
+                          ).withOpacity(0.4),
                           blurRadius: 12,
                           offset: const Offset(0, 6),
                         ),
@@ -203,7 +208,8 @@ class DosesReportScreen extends StatelessWidget {
                               const SizedBox(height: 4),
                               Text(
                                 _getAdherenceMessage(
-                                    reportController.adherenceRate.value),
+                                  reportController.adherenceRate.value,
+                                ),
                                 style: TextStyle(
                                   color: Colors.white.withOpacity(0.9),
                                   fontSize: 12,
@@ -221,7 +227,8 @@ class DosesReportScreen extends StatelessWidget {
                           ),
                           child: Icon(
                             _getAdherenceIcon(
-                                reportController.adherenceRate.value),
+                              reportController.adherenceRate.value,
+                            ),
                             color: Colors.white,
                             size: 40,
                           ),
@@ -261,10 +268,7 @@ class DosesReportScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Text(
-                        'no período selecionado',
-                        style: subtitleTextStyle,
-                      ),
+                      Text('no período selecionado', style: subtitleTextStyle),
                     ],
                   ),
                 );
@@ -336,8 +340,9 @@ class DosesReportScreen extends StatelessWidget {
     Function(DateTime) onDateSelected,
   ) {
     final reportController = Get.find<ReportController>();
-    final isCustom = reportController.selectedPeriod.value == ReportPeriod.custom;
-    
+    final isCustom =
+        reportController.selectedPeriod.value == ReportPeriod.custom;
+
     return OutlinedButton.icon(
       onPressed: () async {
         final picked = await showDatePicker(
@@ -387,23 +392,23 @@ class DosesReportScreen extends StatelessWidget {
           color: isCustom ? primaryColor : Colors.transparent,
           width: isCustom ? 1.5 : 0,
         ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
+  Widget _buildStatCard(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
       decoration: BoxDecoration(
         color: color.withOpacity(0.12),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: color.withOpacity(0.3),
-          width: 1.5,
-        ),
+        border: Border.all(color: color.withOpacity(0.3), width: 1.5),
       ),
       child: Column(
         children: [
@@ -442,7 +447,10 @@ class DosesReportScreen extends StatelessWidget {
 
   Widget _buildDateGroup(String date, List<ReportData> doses) {
     final parsedDate = DateTime.parse(date);
-    final formattedDate = DateFormat('dd/MM/yyyy - EEEE', 'pt_BR').format(parsedDate);
+    final formattedDate = DateFormat(
+      'dd/MM/yyyy - EEEE',
+      'pt_BR',
+    ).format(parsedDate);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -526,10 +534,7 @@ class DosesReportScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: statusColor.withOpacity(0.3),
-          width: 1.5,
-        ),
+        border: Border.all(color: statusColor.withOpacity(0.3), width: 1.5),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -557,7 +562,7 @@ class DosesReportScreen extends StatelessWidget {
                   ),
                 ),
               ),
-            
+
             // Informações da dose
             Expanded(
               child: Column(
@@ -584,7 +589,8 @@ class DosesReportScreen extends StatelessWidget {
                         'Agendado: ${dose.horarioAgendado}',
                         style: subtitleTextStyle,
                       ),
-                      if (dose.wasTaken && dose.horarioTomada != dose.horarioAgendado) ...[
+                      if (dose.wasTaken &&
+                          dose.horarioTomada != dose.horarioAgendado) ...[
                         const SizedBox(width: 8),
                         Text(
                           '• Tomado: ${dose.horarioTomada}',
@@ -615,11 +621,7 @@ class DosesReportScreen extends StatelessWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
-                              statusIcon,
-                              size: 12,
-                              color: statusColor,
-                            ),
+                            Icon(statusIcon, size: 12, color: statusColor),
                             const SizedBox(width: 4),
                             Text(
                               statusText,
@@ -634,7 +636,7 @@ class DosesReportScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  if (dose.observacao != null && 
+                  if (dose.observacao != null &&
                       dose.observacao!.isNotEmpty &&
                       dose.observacao != 'Dose não tomada') ...[
                     const SizedBox(height: 4),
@@ -674,10 +676,7 @@ class DosesReportScreen extends StatelessWidget {
 
   List<Color> _getAdherenceGradient(double rate) {
     final baseColor = _getAdherenceColor(rate);
-    return [
-      baseColor.withOpacity(0.8),
-      baseColor,
-    ];
+    return [baseColor.withOpacity(0.8), baseColor];
   }
 
   String _getAdherenceMessage(double rate) {
@@ -687,4 +686,3 @@ class DosesReportScreen extends StatelessWidget {
     return 'Vamos tentar melhorar juntos! 🤝';
   }
 }
-

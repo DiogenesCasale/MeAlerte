@@ -304,7 +304,7 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
             ? 0
             : (_dataFim!.difference(_dataInicio!).inDays +
                   1), // Compatibilidade
-        dataInicio: _paraSempre ? null : _dataInicio!.toIso8601String(),
+        dataInicio: _dataInicio!.toIso8601String(),
         dataFim: _paraSempre ? null : _dataFim!.toIso8601String(),
         paraSempre: _paraSempre,
         observacao: _observacaoController.text.trim().isEmpty

@@ -311,7 +311,7 @@ class NotificationService {
       final settings = Get.find<SettingsController>();
 
       AndroidNotificationSound? sound;
-      String? iosSound;
+      //String? iosSound;
 
       // Verifica se um som customizado foi selecionado
       if (settings.notificationSoundUri.value != null &&
@@ -320,19 +320,18 @@ class NotificationService {
         if (settings.notificationSoundUri.value == 'silent') {
           // Se for 'silent', não definimos nenhum som
           sound = null;
-          iosSound = null; // Para iOS, `null` desativa o som
+          //iosSound = null; // Para iOS, `null` desativa o som
         } else {
           // Lógica para Android que já tínhamos, está correta.
           sound = UriAndroidNotificationSound(
             settings.notificationSoundUri.value!,
           );
-          iosSound =
-              'default'; // iOS continua usando o padrão mesmo com URI do Android
+          //iosSound = 'default'; // iOS continua usando o padrão mesmo com URI do Android
         }
       } else {
         // Se 'Padrão' estiver selecionado
         sound = null;
-        iosSound = 'default';
+        //iosSound = 'default';
       }
 
       final channelId = _getChannelIdForSound(

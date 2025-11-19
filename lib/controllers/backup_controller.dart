@@ -235,26 +235,27 @@ class BackupController extends GetxController {
 
       // Inicia transação
       await db.transaction((txn) async {
+        // NÃO LIMPAR AS TABELAS, APENAS RESTAURAR OS DADOS, POIS O RESTAURAR SÓ APARECE NO INICIO DO APP
         // Limpa todas as tabelas (soft delete)
-        final tables = [
-          'tblPerfil',
-          'tblMedicamentos',
-          'tblMedicamentosAgendados',
-          'tblDadosSaude',
-          'tblDosesTomadas',
-          'tblEstoqueMedicamento',
-          'tblNotificacoes',
-          'tblAnotacoes',
-        ];
+        // final tables = [
+        //   'tblPerfil',
+        //   'tblMedicamentos',
+        //   'tblMedicamentosAgendados',
+        //   'tblDadosSaude',
+        //   'tblDosesTomadas',
+        //   'tblEstoqueMedicamento',
+        //   'tblNotificacoes',
+        //   'tblAnotacoes',
+        // ];
 
         // Marca todos como deletados
-        for (final table in tables) {
-          try {
-            await txn.update(table, {'deletado': 1});
-          } catch (e) {
-            print('Erro ao limpar tabela $table: $e');
-          }
-        }
+        // for (final table in tables) {
+        //   try {
+        //     await txn.update(table, {'deletado': 1});
+        //   } catch (e) {
+        //     print('Erro ao limpar tabela $table: $e');
+        //   }
+        // }
 
         // Restaura dados do backup
         final tablesData = backupData['tables'] as Map<String, dynamic>?;
@@ -270,8 +271,6 @@ class BackupController extends GetxController {
                 );
                 // Remove o campo id temporariamente para evitar conflitos
                 rowMap.remove('id');
-                // Garante que deletado = 0
-                rowMap['deletado'] = 0;
 
                 // Insere o registro (deixa o banco gerenciar os IDs)
                 await txn.insert(tableName, rowMap);
