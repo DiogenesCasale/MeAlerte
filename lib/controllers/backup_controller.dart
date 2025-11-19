@@ -235,51 +235,205 @@ class BackupController extends GetxController {
 
       // Inicia transação
       await db.transaction((txn) async {
-        // NÃO LIMPAR AS TABELAS, APENAS RESTAURAR OS DADOS, POIS O RESTAURAR SÓ APARECE NO INICIO DO APP
-        // Limpa todas as tabelas (soft delete)
-        // final tables = [
-        //   'tblPerfil',
-        //   'tblMedicamentos',
-        //   'tblMedicamentosAgendados',
-        //   'tblDadosSaude',
-        //   'tblDosesTomadas',
-        //   'tblEstoqueMedicamento',
-        //   'tblNotificacoes',
-        //   'tblAnotacoes',
-        // ];
-
-        // Marca todos como deletados
-        // for (final table in tables) {
-        //   try {
-        //     await txn.update(table, {'deletado': 1});
-        //   } catch (e) {
-        //     print('Erro ao limpar tabela $table: $e');
-        //   }
-        // }
-
-        // Restaura dados do backup
+        // Restaura dados do backup com mapeamento de IDs
         final tablesData = backupData['tables'] as Map<String, dynamic>?;
-        if (tablesData != null) {
-          for (final entry in tablesData.entries) {
-            final tableName = entry.key;
-            final rows = entry.value as List<dynamic>;
+        if (tablesData == null) {
+          print('Nenhum dado de tabela encontrado no backup');
+          return;
+        }
 
-            for (final row in rows) {
-              try {
-                final rowMap = Map<String, dynamic>.from(
-                  row as Map<String, dynamic>,
-                );
-                // Remove o campo id temporariamente para evitar conflitos
-                rowMap.remove('id');
+        // Mapas para rastrear IDs antigos -> novos IDs
+        final idMaps = <String, Map<int, int>>{
+          'tblPerfil': {},
+          'tblMedicamentos': {},
+          'tblMedicamentosAgendados': {},
+          'tblDadosSaude': {},
+          'tblAnotacoes': {},
+        };
 
-                // Insere o registro (deixa o banco gerenciar os IDs)
-                await txn.insert(tableName, rowMap);
-              } catch (e) {
-                print('Erro ao restaurar registro na tabela $tableName: $e');
+        // Ordem de restauração (respeitando dependências de chaves estrangeiras)
+        final tablesToRestore = [
+          'tblPerfil',
+          'tblMedicamentos',
+          'tblMedicamentosAgendados',
+          'tblDadosSaude',
+          'tblDosesTomadas',
+          'tblEstoqueMedicamento',
+          'tblNotificacoes',
+          'tblAnotacoes',
+        ];
+
+        for (final tableName in tablesToRestore) {
+          if (!tablesData.containsKey(tableName)) {
+            print('Tabela $tableName não encontrada no backup, pulando...');
+            continue;
+          }
+
+          final rows = tablesData[tableName] as List<dynamic>;
+          print('Restaurando $tableName: ${rows.length} registros');
+
+          for (final row in rows) {
+            try {
+              final rowMap = Map<String, dynamic>.from(
+                row as Map<String, dynamic>,
+              );
+              
+              final oldId = rowMap['id'] as int?;
+              rowMap.remove('id'); // Remove ID antigo
+
+              // Atualiza chaves estrangeiras com os novos IDs mapeados
+              switch (tableName) {
+                case 'tblMedicamentos':
+                  if (rowMap.containsKey('idPerfil') && rowMap['idPerfil'] != null) {
+                    final oldPerfilId = rowMap['idPerfil'] as int;
+                    final newPerfilId = idMaps['tblPerfil']?[oldPerfilId];
+                    if (newPerfilId != null) {
+                      rowMap['idPerfil'] = newPerfilId;
+                    } else {
+                      print('Aviso: Perfil ID $oldPerfilId não encontrado, pulando medicamento');
+                      continue; // Pula este medicamento se o perfil não existe
+                    }
+                  }
+                  break;
+
+                case 'tblMedicamentosAgendados':
+                  if (rowMap.containsKey('idMedicamento') && rowMap['idMedicamento'] != null) {
+                    final oldMedId = rowMap['idMedicamento'] as int;
+                    final newMedId = idMaps['tblMedicamentos']?[oldMedId];
+                    if (newMedId != null) {
+                      rowMap['idMedicamento'] = newMedId;
+                    } else {
+                      print('Aviso: Medicamento ID $oldMedId não encontrado, pulando agendamento');
+                      continue;
+                    }
+                  }
+                  if (rowMap.containsKey('idPerfil') && rowMap['idPerfil'] != null) {
+                    final oldPerfilId = rowMap['idPerfil'] as int;
+                    final newPerfilId = idMaps['tblPerfil']?[oldPerfilId];
+                    if (newPerfilId != null) {
+                      rowMap['idPerfil'] = newPerfilId;
+                    } else {
+                      print('Aviso: Perfil ID $oldPerfilId não encontrado, pulando agendamento');
+                      continue;
+                    }
+                  }
+                  if (rowMap.containsKey('idAgendamentoPai') && rowMap['idAgendamentoPai'] != null) {
+                    final oldAgendId = rowMap['idAgendamentoPai'] as int;
+                    final newAgendId = idMaps['tblMedicamentosAgendados']?[oldAgendId];
+                    if (newAgendId != null) {
+                      rowMap['idAgendamentoPai'] = newAgendId;
+                    } else {
+                      print('Aviso: Agendamento pai ID $oldAgendId não encontrado ainda');
+                      // Não pula, apenas deixa null
+                      rowMap['idAgendamentoPai'] = null;
+                    }
+                  }
+                  break;
+
+                case 'tblDadosSaude':
+                  if (rowMap.containsKey('idPerfil') && rowMap['idPerfil'] != null) {
+                    final oldPerfilId = rowMap['idPerfil'] as int;
+                    final newPerfilId = idMaps['tblPerfil']?[oldPerfilId];
+                    if (newPerfilId != null) {
+                      rowMap['idPerfil'] = newPerfilId;
+                    } else {
+                      print('Aviso: Perfil ID $oldPerfilId não encontrado, pulando dado de saúde');
+                      continue;
+                    }
+                  }
+                  break;
+
+                case 'tblDosesTomadas':
+                  if (rowMap.containsKey('idAgendamento') && rowMap['idAgendamento'] != null) {
+                    final oldAgendId = rowMap['idAgendamento'] as int;
+                    final newAgendId = idMaps['tblMedicamentosAgendados']?[oldAgendId];
+                    if (newAgendId != null) {
+                      rowMap['idAgendamento'] = newAgendId;
+                    } else {
+                      print('Aviso: Agendamento ID $oldAgendId não encontrado, pulando dose');
+                      continue;
+                    }
+                  }
+                  if (rowMap.containsKey('idPerfil') && rowMap['idPerfil'] != null) {
+                    final oldPerfilId = rowMap['idPerfil'] as int;
+                    final newPerfilId = idMaps['tblPerfil']?[oldPerfilId];
+                    if (newPerfilId != null) {
+                      rowMap['idPerfil'] = newPerfilId;
+                    } else {
+                      print('Aviso: Perfil ID $oldPerfilId não encontrado, pulando dose');
+                      continue;
+                    }
+                  }
+                  break;
+
+                case 'tblEstoqueMedicamento':
+                  if (rowMap.containsKey('idMedicamento') && rowMap['idMedicamento'] != null) {
+                    final oldMedId = rowMap['idMedicamento'] as int;
+                    final newMedId = idMaps['tblMedicamentos']?[oldMedId];
+                    if (newMedId != null) {
+                      rowMap['idMedicamento'] = newMedId;
+                    } else {
+                      print('Aviso: Medicamento ID $oldMedId não encontrado, pulando estoque');
+                      continue;
+                    }
+                  }
+                  break;
+
+                case 'tblNotificacoes':
+                  if (rowMap.containsKey('idPerfil') && rowMap['idPerfil'] != null) {
+                    final oldPerfilId = rowMap['idPerfil'] as int;
+                    final newPerfilId = idMaps['tblPerfil']?[oldPerfilId];
+                    if (newPerfilId != null) {
+                      rowMap['idPerfil'] = newPerfilId;
+                    } else {
+                      print('Aviso: Perfil ID $oldPerfilId não encontrado, pulando notificação');
+                      continue;
+                    }
+                  }
+                  if (rowMap.containsKey('idAgendamento') && rowMap['idAgendamento'] != null) {
+                    final oldAgendId = rowMap['idAgendamento'] as int;
+                    final newAgendId = idMaps['tblMedicamentosAgendados']?[oldAgendId];
+                    if (newAgendId != null) {
+                      rowMap['idAgendamento'] = newAgendId;
+                    } else {
+                      print('Aviso: Agendamento ID $oldAgendId não encontrado, pulando notificação');
+                      continue;
+                    }
+                  }
+                  break;
+
+                case 'tblAnotacoes':
+                  if (rowMap.containsKey('idPerfil') && rowMap['idPerfil'] != null) {
+                    final oldPerfilId = rowMap['idPerfil'] as int;
+                    final newPerfilId = idMaps['tblPerfil']?[oldPerfilId];
+                    if (newPerfilId != null) {
+                      rowMap['idPerfil'] = newPerfilId;
+                    } else {
+                      print('Aviso: Perfil ID $oldPerfilId não encontrado, pulando anotação');
+                      continue;
+                    }
+                  }
+                  break;
               }
+
+              // Insere o registro e obtém o novo ID
+              final newId = await txn.insert(tableName, rowMap);
+              
+              // Armazena o mapeamento oldId -> newId
+              if (oldId != null && idMaps.containsKey(tableName)) {
+                idMaps[tableName]![oldId] = newId;
+                print('$tableName: ID $oldId -> $newId');
+              }
+            } catch (e) {
+              print('Erro ao restaurar registro na tabela $tableName: $e');
             }
           }
         }
+
+        print('Restauração concluída. Mapeamentos de ID:');
+        idMaps.forEach((table, map) {
+          print('  $table: ${map.length} IDs mapeados');
+        });
       });
 
       // Nota: Os controllers serão recarregados automaticamente quando necessário
