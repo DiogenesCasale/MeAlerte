@@ -696,6 +696,14 @@ class BackupController extends GetxController {
       // --- INÍCIO DA CORREÇÃO (CONEXÃO PRIVADA) ---
       print('Iniciando limpeza (método de conexão privada)...');
 
+      // 0. Cancelar todas as notificações antes de limpar o banco
+      try {
+        await NotificationService().cancelAllNotifications();
+        print('Todas as notificações foram canceladas antes da limpeza.');
+      } catch (e) {
+        print('Erro ao cancelar notificações: $e');
+      }
+
       // 1. Descobrir o caminho do banco (sem usar o controller)
       //    (O nome 'app_remedio_v4.db' foi pego do seu DatabaseController)
       final dbDirectoryPath = await getDatabasesPath();

@@ -1,3 +1,4 @@
+import 'package:app_remedio/controllers/schedules_controller.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app_remedio/utils/notification_service.dart';
@@ -47,6 +48,15 @@ class SettingsController extends GetxController {
   void setNotificationsEnabled(bool value) {
     notificationsEnabled.value = value;
     _prefs.setBool(keyNotificationsEnabled, value);
+    // Se for desativar as notificações, cancela todas
+    if (!value) {
+      NotificationService().cancelAllNotifications();
+    }
+    // Se for ativar as notificações, reagenda todas
+    else {
+      final schedulesController = Get.find<SchedulesController>();
+      schedulesController.rescheduleAllNotifications();
+    }
   }
 
   void setVibrate(bool value) {
@@ -57,11 +67,17 @@ class SettingsController extends GetxController {
   void setTimeBefore(int minutes) {
     timeBefore.value = minutes;
     _prefs.setInt(keyTimeBefore, minutes);
+    // Reagenda todas as notificações
+    final schedulesController = Get.find<SchedulesController>();
+    schedulesController.rescheduleAllNotifications();
   }
 
   void setTimeAfter(int minutes) {
     timeAfter.value = minutes;
     _prefs.setInt(keyTimeAfter, minutes);
+    // Reagenda todas as notificações
+    final schedulesController = Get.find<SchedulesController>();
+    schedulesController.rescheduleAllNotifications();
   }
 
   void setReminderText(String text) {
@@ -95,5 +111,7 @@ class SettingsController extends GetxController {
       oldSoundUri: oldSoundUri,
       newSoundUri: sanitizedUri,
     );
+    final schedulesController = Get.find<SchedulesController>();
+    await schedulesController.rescheduleAllNotifications();
   }
 }

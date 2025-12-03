@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
@@ -86,14 +88,44 @@ class UsageReportScreen extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
+                // Imagem do medicamento (se houver)
+                if (medication.caminhoImagem != null &&
+                    medication.caminhoImagem!.isNotEmpty)
+                  Container(
+                    width: 48,
+                    height: 48,
+                    margin: const EdgeInsets.only(right: 12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      color: backgroundColor,
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.file(
+                        File(medication.caminhoImagem!),
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Icon(
+                          Icons.medication,
+                          color: textColor.withOpacity(0.3),
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  Container(
+                    width: 48,
+                    height: 48,
+                    margin: const EdgeInsets.only(right: 12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      color: backgroundColor,
+                    ),
+                    child: Icon(
+                      Icons.medication,
+                      color: textColor.withOpacity(0.3),
+                    ),
                   ),
-                  child: Icon(Icons.medication, color: primaryColor),
-                ),
+
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
@@ -241,6 +273,16 @@ class UsageReportScreen extends StatelessWidget {
                       final history = snapshot.data![index];
                       final isEntry = history.type == StockMovementType.entrada;
 
+                      final formattedQuantity =
+                          history.quantity == history.quantity.truncate()
+                          ? history.quantity.truncate().toString()
+                          : history.quantity.toString().replaceAll('.', ',');
+                      final prefix = isEntry
+                          ? '+'
+                          : history.quantity < 0
+                          ? ''
+                          : '-';
+
                       return Container(
                         margin: const EdgeInsets.only(bottom: 12),
                         padding: const EdgeInsets.all(12),
@@ -296,7 +338,7 @@ class UsageReportScreen extends StatelessWidget {
                               ),
                             ),
                             Text(
-                              '${isEntry ? '+' : '-'}${history.quantity.toStringAsFixed(0)}',
+                              '${prefix}${formattedQuantity}',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,

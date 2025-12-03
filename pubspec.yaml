@@ -22,7 +22,7 @@ dependencies:
   scrollable_positioned_list: ^0.3.8 # Para a rolagem da lista de datas na tela de agendamentos
   package_info_plus: ^9.0.0
   url_launcher: ^6.2.6 # Para abrir links externos
-  share_plus: ^9.0.0 # Para compartilhar textos, imagens e arquivos
+  share_plus: ^12.0.0 # Para compartilhar textos, imagens e arquivos
   flutter_local_notifications: ^19.4.2 # Notificações locais
   timezone: ^0.10.1 # Para lidar com fusos horários nas notificações
   fl_chart: ^1.1.1 # Gráficos, especialmente para a tela de dados de saúde
@@ -30,6 +30,9 @@ dependencies:
   jbh_ringtone: ^1.0.3 # Para tocar toques personalizados nas notificações
   device_info_plus: ^10.1.2 # Para obter informações do dispositivo
   file_picker: ^8.0.7 # Para selecionar arquivos de backup
+  pdf: ^3.11.3 # Para montar PDFs
+  printing: ^5.14.2 # Para gerar arquivos android
+  csv: ^6.0.0 # Para exportar dados para CSV
 
 
 dev_dependencies:

@@ -83,7 +83,9 @@ class NotificationService {
       try {
         final Map<String, dynamic> data = jsonDecode(response.payload!);
         final _profileController = Get.find<ProfileController>();
-        final Profile? profile = await _profileController.getProfileById(data['idPerfil']);
+        final Profile? profile = await _profileController.getProfileById(
+          data['idPerfil'],
+        );
 
         // 1. Salva a notificação no banco e pega o ID recém-criado.
         final int? newNotificationId = await _notificationController
@@ -102,7 +104,6 @@ class NotificationService {
           );
           await _notificationController.markAsRead(newNotificationId);
           await _profileController.setCurrentProfile(profile!);
-
         } else {
           print(
             '⚠️ Falha ao salvar a notificação, não foi possível marcar como lida.',
@@ -219,11 +220,11 @@ class NotificationService {
   int _generateNotificationId(
     int scheduledId,
     DateTime time,
-    bool isReminderBefore,
+    int type, // 1: Before, 2: Exact, 3: After
   ) {
     final timeId = time.millisecondsSinceEpoch ~/ 60000;
-    final typePrefix = isReminderBefore ? 1 : 2;
-    return int.parse('$typePrefix${scheduledId % 1000}$timeId') % 2147483647;
+    // type is now directly used as prefix
+    return int.parse('$type${scheduledId % 1000}$timeId') % 2147483647;
   }
 
   Future<void> scheduleMedicationNotifications(TodayDose dose) async {
@@ -256,11 +257,11 @@ class NotificationService {
             id: _generateNotificationId(
               dose.scheduledMedicationId,
               dose.scheduledTime,
-              true,
+              1, // Type 1: Before
             ),
             title: 'Lembrete de Medicamento',
             body:
-                'Olá, ${profile?.nome ?? 'Usuário'}! Está na hora de tomar seu medicamento! Tomar ${dose.medicationName} (${dose.dose}) às ${DateFormat('HH:mm').format(dose.scheduledTime)}.',
+                'Olá, ${profile?.nome ?? 'Usuário'}! Está perto da hora de tomar seu medicamento! Tomar ${dose.medicationName} (${dose.dose}) às ${DateFormat('HH:mm').format(dose.scheduledTime)}.',
             scheduledDate: tz.TZDateTime.from(scheduledTimeBefore, tz.local),
             idAgendamento: dose.scheduledMedicationId,
             idPerfil: dose.idPerfil,
@@ -269,6 +270,26 @@ class NotificationService {
             '⏰ Notificação de lembrete agendada para: ${DateFormat('dd/MM/yyyy HH:mm').format(scheduledTimeBefore)}',
           );
         }
+      }
+
+      // Notificação na hora exata
+      if (dose.scheduledTime.isAfter(DateTime.now())) {
+        await _scheduleSingleNotification(
+          id: _generateNotificationId(
+            dose.scheduledMedicationId,
+            dose.scheduledTime,
+            2, // Type 2: Exact
+          ),
+          title: 'Hora do Medicamento',
+          body:
+              'Olá, ${profile?.nome ?? 'Usuário'}! Está na hora de tomar seu medicamento: ${dose.medicationName} (${dose.dose}).',
+          scheduledDate: tz.TZDateTime.from(dose.scheduledTime, tz.local),
+          idAgendamento: dose.scheduledMedicationId,
+          idPerfil: dose.idPerfil,
+        );
+        print(
+          '⏰ Notificação exata agendada para: ${DateFormat('dd/MM/yyyy HH:mm').format(dose.scheduledTime)}',
+        );
       }
 
       if (settings.timeAfter.value > 0) {
@@ -280,7 +301,7 @@ class NotificationService {
             id: _generateNotificationId(
               dose.scheduledMedicationId,
               dose.scheduledTime,
-              false,
+              3, // Type 3: After
             ),
             title: 'Medicamento Atrasado',
             body:
@@ -411,14 +432,21 @@ class NotificationService {
         _generateNotificationId(
           dose.scheduledMedicationId,
           dose.scheduledTime,
-          true,
+          1, // Cancel Before
         ),
       );
       await _notificationsPlugin.cancel(
         _generateNotificationId(
           dose.scheduledMedicationId,
           dose.scheduledTime,
-          false,
+          2, // Cancel Exact
+        ),
+      );
+      await _notificationsPlugin.cancel(
+        _generateNotificationId(
+          dose.scheduledMedicationId,
+          dose.scheduledTime,
+          3, // Cancel After
         ),
       );
       print('✅ Notificações canceladas para: ${dose.medicationName}');

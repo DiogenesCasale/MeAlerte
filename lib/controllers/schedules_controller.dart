@@ -71,6 +71,8 @@ class SchedulesController extends GetxController {
     try {
       backfillMissedNotifications();
       await fetchSchedulesForSelectedDate();
+      // Garante que as notificações estejam sincronizadas ao iniciar o app
+      await rescheduleAllNotifications();
     } catch (e) {
       print('Erro ao inicializar dados: $e');
     }

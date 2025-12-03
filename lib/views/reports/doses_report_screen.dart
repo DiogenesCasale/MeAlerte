@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:app_remedio/controllers/report_controller.dart';
 import 'package:app_remedio/utils/constants.dart';
+import 'package:app_remedio/views/reports/report_charts.dart';
 
 class DosesReportScreen extends StatelessWidget {
   final bool isEmbedded;
@@ -24,246 +25,321 @@ class DosesReportScreen extends StatelessWidget {
               foregroundColor: textColor,
               centerTitle: true,
               elevation: 0,
-            ),
-      body: Column(
-        children: [
-          // Filtros de período
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: Obx(
-              () => SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _buildPeriodChip(
-                      'Última Semana',
-                      ReportPeriod.lastWeek,
-                      reportController,
-                    ),
-                    _buildPeriodChip(
-                      'Último Mês',
-                      ReportPeriod.lastMonth,
-                      reportController,
-                    ),
-                    _buildPeriodChip(
-                      'Últimos 3 Meses',
-                      ReportPeriod.last3Months,
-                      reportController,
-                    ),
-                  ],
+              actions: [
+                PopupMenuButton<String>(
+                  icon: Icon(Icons.download, color: primaryColor),
+                  onSelected: (value) {
+                    if (value == 'pdf') {
+                      reportController.exportToPdf();
+                    } else if (value == 'csv') {
+                      reportController.exportToCsv();
+                    }
+                  },
+                  itemBuilder: (BuildContext context) =>
+                      <PopupMenuEntry<String>>[
+                        const PopupMenuItem<String>(
+                          value: 'pdf',
+                          child: Row(
+                            children: [
+                              Icon(Icons.picture_as_pdf, color: Colors.red),
+                              SizedBox(width: 8),
+                              Text('Exportar PDF'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem<String>(
+                          value: 'csv',
+                          child: Row(
+                            children: [
+                              Icon(Icons.table_chart, color: Colors.green),
+                              SizedBox(width: 8),
+                              Text('Exportar CSV'),
+                            ],
+                          ),
+                        ),
+                      ],
                 ),
-              ),
+              ],
             ),
-          ),
-
-          // Seletor de datas personalizado
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-            child: Obx(
-              () => Row(
-                children: [
-                  Expanded(
-                    child: _buildDateButton(
-                      context,
-                      'De:',
-                      reportController.startDate.value,
-                      (date) {
-                        reportController.setCustomPeriod(
-                          date,
-                          reportController.endDate.value,
-                        );
-                      },
+      body: CustomScrollView(
+        slivers: [
+          // Filtros e Gráficos (Topo rolável)
+          SliverToBoxAdapter(
+            child: Column(
+              children: [
+                // Filtros de período
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: Obx(
+                    () => SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _buildPeriodChip(
+                            'Última Semana',
+                            ReportPeriod.lastWeek,
+                            reportController,
+                          ),
+                          _buildPeriodChip(
+                            'Último Mês',
+                            ReportPeriod.lastMonth,
+                            reportController,
+                          ),
+                          _buildPeriodChip(
+                            'Últimos 3 Meses',
+                            ReportPeriod.last3Months,
+                            reportController,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildDateButton(
-                      context,
-                      'Até:',
-                      reportController.endDate.value,
-                      (date) {
-                        reportController.setCustomPeriod(
-                          reportController.startDate.value,
-                          date,
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+                ),
 
-          // Estatísticas
-          Obx(() {
-            if (reportController.isLoading.value) {
-              return const SizedBox.shrink();
-            }
-
-            return Container(
-              margin: const EdgeInsets.only(top: 1),
-              padding: const EdgeInsets.all(16),
-              color: surfaceColor,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Resumo:',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: textColor,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildStatCard(
-                          'Total',
-                          reportController.totalDoses.value.toString(),
-                          Icons.medication,
-                          primaryColor,
+                // Seletor de datas personalizado
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  child: Obx(
+                    () => Row(
+                      children: [
+                        Expanded(
+                          child: _buildDateButton(
+                            context,
+                            'De:',
+                            reportController.startDate.value,
+                            (date) {
+                              reportController.setCustomPeriod(
+                                date,
+                                reportController.endDate.value,
+                              );
+                            },
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _buildStatCard(
-                          'Tomadas',
-                          reportController.dosesTaken.value.toString(),
-                          Icons.check_circle,
-                          Colors.green,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _buildStatCard(
-                          'Perdidas',
-                          reportController.dosesMissed.value.toString(),
-                          Icons.cancel,
-                          Colors.red,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _buildStatCard(
-                          'Atrasadas',
-                          reportController.dosesLate.value.toString(),
-                          Icons.access_time,
-                          Colors.orange,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: _getAdherenceGradient(
-                          reportController.adherenceRate.value,
-                        ),
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: _getAdherenceColor(
-                            reportController.adherenceRate.value,
-                          ).withOpacity(0.4),
-                          blurRadius: 12,
-                          offset: const Offset(0, 6),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildDateButton(
+                            context,
+                            'Até:',
+                            reportController.endDate.value,
+                            (date) {
+                              reportController.setCustomPeriod(
+                                reportController.startDate.value,
+                                date,
+                              );
+                            },
+                          ),
                         ),
                       ],
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  ),
+                ),
+
+                // Estatísticas
+                Obx(() {
+                  if (reportController.isLoading.value) {
+                    return const SizedBox.shrink();
+                  }
+
+                  return Container(
+                    margin: const EdgeInsets.only(top: 1),
+                    padding: const EdgeInsets.all(16),
+                    color: surfaceColor,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Taxa de Aderência',
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.95),
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.5,
-                                ),
+                        Text(
+                          'Resumo:',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: textColor,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildStatCard(
+                                'Total',
+                                reportController.totalDoses.value.toString(),
+                                Icons.medication,
+                                primaryColor,
                               ),
-                              const SizedBox(height: 8),
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.baseline,
-                                textBaseline: TextBaseline.alphabetic,
-                                children: [
-                                  Text(
-                                    '${reportController.adherenceRate.value.toStringAsFixed(1)}',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 42,
-                                      fontWeight: FontWeight.bold,
-                                      height: 1.0,
-                                    ),
-                                  ),
-                                  const Text(
-                                    '%',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _buildStatCard(
+                                'Tomadas',
+                                reportController.dosesTaken.value.toString(),
+                                Icons.check_circle,
+                                Colors.green,
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                _getAdherenceMessage(
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _buildStatCard(
+                                'Perdidas',
+                                reportController.dosesMissed.value.toString(),
+                                Icons.cancel,
+                                Colors.red,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _buildStatCard(
+                                'Atrasadas',
+                                reportController.dosesLate.value.toString(),
+                                Icons.access_time,
+                                Colors.orange,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+
+                        // --- NOVOS GRÁFICOS ---
+
+                        // Gráfico de Pizza (Aderência)
+                        Text(
+                          'Distribuição de Doses',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: textColor,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        AdherencePieChart(controller: reportController),
+                        const SizedBox(height: 20),
+
+                        // Gráfico de Barras (Tendência Diária)
+                        Text(
+                          'Tendência Diária (Tomadas)',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: textColor,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        DailyTrendBarChart(controller: reportController),
+                        const SizedBox(height: 20),
+
+                        // Card de Horário Crítico
+                        CriticalTimeCard(controller: reportController),
+                        const SizedBox(height: 20),
+
+                        // --- FIM NOVOS GRÁFICOS ---
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: _getAdherenceGradient(
+                                reportController.adherenceRate.value,
+                              ),
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: _getAdherenceColor(
                                   reportController.adherenceRate.value,
+                                ).withOpacity(0.4),
+                                blurRadius: 12,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Taxa de Aderência',
+                                      style: TextStyle(
+                                        color: Colors.white.withOpacity(0.95),
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.baseline,
+                                      textBaseline: TextBaseline.alphabetic,
+                                      children: [
+                                        Text(
+                                          '${reportController.adherenceRate.value.toStringAsFixed(1)}',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 42,
+                                            fontWeight: FontWeight.bold,
+                                            height: 1.0,
+                                          ),
+                                        ),
+                                        const Text(
+                                          '%',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _getAdherenceMessage(
+                                        reportController.adherenceRate.value,
+                                      ),
+                                      style: TextStyle(
+                                        color: Colors.white.withOpacity(0.9),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.9),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
+                              ),
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.25),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Icon(
+                                  _getAdherenceIcon(
+                                    reportController.adherenceRate.value,
+                                  ),
+                                  color: Colors.white,
+                                  size: 40,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.25),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Icon(
-                            _getAdherenceIcon(
-                              reportController.adherenceRate.value,
-                            ),
-                            color: Colors.white,
-                            size: 40,
-                          ),
-                        ),
                       ],
                     ),
-                  ),
-                ],
-              ),
-            );
-          }),
+                  );
+                }),
+              ],
+            ),
+          ),
 
-          // Lista de doses
-          Expanded(
-            child: Obx(() {
-              if (reportController.isLoading.value) {
-                return Center(
-                  child: CircularProgressIndicator(color: primaryColor),
-                );
-              }
+          // Lista de doses (SliverList)
+          Obx(() {
+            if (reportController.isLoading.value) {
+              return const SliverFillRemaining(
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
 
-              if (reportController.reportData.isEmpty) {
-                return Center(
+            if (reportController.reportData.isEmpty) {
+              return SliverFillRemaining(
+                child: Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -283,28 +359,32 @@ class DosesReportScreen extends StatelessWidget {
                       Text('no período selecionado', style: subtitleTextStyle),
                     ],
                   ),
-                );
-              }
-
-              // Agrupa doses por data
-              final groupedByDate = <String, List<ReportData>>{};
-              for (var dose in reportController.reportData) {
-                groupedByDate.putIfAbsent(dose.dataTomada, () => []).add(dose);
-              }
-
-              final dates = groupedByDate.keys.toList();
-
-              return ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: dates.length,
-                itemBuilder: (context, index) {
-                  final date = dates[index];
-                  final doses = groupedByDate[date]!;
-                  return _buildDateGroup(date, doses);
-                },
+                ),
               );
-            }),
-          ),
+            }
+
+            // Agrupa doses por data
+            final groupedByDate = <String, List<ReportData>>{};
+            for (var dose in reportController.reportData) {
+              groupedByDate.putIfAbsent(dose.dataTomada, () => []).add(dose);
+            }
+
+            final dates = groupedByDate.keys.toList();
+
+            return SliverList(
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final date = dates[index];
+                final doses = groupedByDate[date]!;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: _buildDateGroup(date, doses),
+                );
+              }, childCount: dates.length),
+            );
+          }),
+
+          // Espaço extra no final
+          const SliverToBoxAdapter(child: SizedBox(height: 20)),
         ],
       ),
     );
@@ -576,7 +656,6 @@ class DosesReportScreen extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
-            // Imagem do medicamento (se houver)
             if (dose.caminhoImagem != null && dose.caminhoImagem!.isNotEmpty)
               Container(
                 width: 48,
@@ -596,6 +675,20 @@ class DosesReportScreen extends StatelessWidget {
                       color: textColor.withOpacity(0.3),
                     ),
                   ),
+                ),
+              )
+            else
+              Container(
+                width: 48,
+                height: 48,
+                margin: const EdgeInsets.only(right: 12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: backgroundColor,
+                ),
+                child: Icon(
+                  Icons.medication,
+                  color: textColor.withOpacity(0.3),
                 ),
               ),
 
@@ -672,16 +765,17 @@ class DosesReportScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  if (dose.lateDuration != null && dose.status == ReportStatus.late) ...[
-                     const SizedBox(height: 2),
-                     Text(
-                       'Atraso de ${_formatDuration(dose.lateDuration!)}',
-                       style: TextStyle(
-                         fontSize: 11,
-                         color: Colors.orange[800],
-                         fontWeight: FontWeight.w500,
-                       ),
-                     ),
+                  if (dose.lateDuration != null &&
+                      dose.status == ReportStatus.late) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      'Atraso de ${_formatDuration(dose.lateDuration!)}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.orange[800],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ],
                   if (dose.observacao != null &&
                       dose.observacao!.isNotEmpty &&

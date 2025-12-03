@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:app_remedio/views/schedules/schedule_list_screen.dart';
 import 'package:app_remedio/views/medication/medication_list_screen.dart';
-import 'package:app_remedio/views/profile_screen.dart';
+import 'package:app_remedio/views/profile/profile_screen.dart';
 import 'package:app_remedio/controllers/profile_controller.dart';
 import 'package:app_remedio/widgets/bottom_navigation_widget.dart';
 import 'package:get/get.dart';
