@@ -20,8 +20,8 @@ import 'package:app_remedio/widgets/app_header_widget.dart';
 import 'package:app_remedio/models/action_button_model.dart';
 import 'package:intl/intl.dart';
 
-import 'package:url_launcher/url_launcher.dart'; // Para abrir URLs (WhatsApp)
 import 'package:app_remedio/controllers/profile_controller.dart'; // Precisamos do ProfileController para a mensagem
+import 'package:share_plus/share_plus.dart';
 
 class ScheduleListScreen extends GetView<SchedulesController> {
   final bool showAppBar;
@@ -706,10 +706,9 @@ class ScheduleListScreen extends GetView<SchedulesController> {
                   child: Icon(statusIcon, color: statusColor, size: 22),
                 ),
               ),
-            
+
               // Não precisa mais de um SizedBox aqui, o padding do InkWell já cria um espaço
               const SizedBox(width: 6), // Remova ou ajuste se necessário
-
               // --- FIM DA MODIFICAÇÃO ---
               Expanded(
                 child: Column(
@@ -848,163 +847,46 @@ class ScheduleListScreen extends GetView<SchedulesController> {
     BuildContext mainContext,
     BuildContext modalContext,
     TodayDose dose,
-  ) {
-    // 1. Fecha o modal de detalhes usando o CONTEXTO DO MODAL (modalContext)
+  ) async {
+    // 1. Fecha o modal de detalhes
     Navigator.of(modalContext).pop();
 
-    // 2. Abre o novo modal usando o CONTEXTO PRINCIPAL (mainContext)
-    // Adiciona um pequeno delay para garantir que o primeiro modal foi completamente removido da árvore de widgets
-    Future.delayed(const Duration(milliseconds: 100), () {
-      _showShareOptionsModal(mainContext, dose);
-    });
-  }
-
-  void _showShareOptionsModal(BuildContext context, TodayDose dose) async {
-    // Busca o controller do perfil para pegar a mensagem personalizada
+    // 2. Prepara a mensagem
     final ProfileController profileController = Get.find<ProfileController>();
     final Profile? currentLoadedProfile =
         profileController.currentProfile.value;
-
-    // Espera (await) o resultado da busca no banco de dados
     final Profile? freshProfile = await profileController.getProfileById(
       currentLoadedProfile?.id,
     );
 
-    // Agora 'freshProfile' é um objeto Profile (ou null), e não mais um Future.
     final String customMessageTemplate =
         freshProfile?.mensagemCompartilhar ?? defaultMessageTemplate;
 
-    // Monta a mensagem final substituindo os placeholders
     final String doseAmount = dose.dose % 1 == 0
         ? dose.dose.toInt().toString()
         : dose.dose.toString();
     final String timeFormatted = DateFormat('HH:mm').format(dose.scheduledTime);
 
-    // Substitui as variáveis na mensagem do perfil
     String shareMessage = customMessageTemplate
         .replaceAll('{nomePerfil}', freshProfile?.nome ?? 'Usuário')
         .replaceAll('{remedio}', dose.medicationName)
         .replaceAll('{dose}', doseAmount)
         .replaceAll('{hora}', timeFormatted);
 
-    // Adiciona observação se houver
     if (dose.observacao != null && dose.observacao!.isNotEmpty) {
       shareMessage += '\n\n*Observação:* ${dose.observacao}';
     }
 
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: surfaceColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Compartilhar Agendamento',
-              textAlign: TextAlign.center,
-              style: heading2Style,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              dose.medicationName,
-              textAlign: TextAlign.center,
-              style: bodyTextStyle.copyWith(color: textColor.withOpacity(0.7)),
-            ),
-            const SizedBox(height: 24),
-            OutlinedButton.icon(
-              icon: Icon(Icons.copy, color: backgroundColor),
-              label: Text(
-                'Copiar Mensagem',
-                style: TextStyle(color: backgroundColor),
-              ),
-              style: OutlinedButton.styleFrom(
-                backgroundColor: primaryColor,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              onPressed: () async {
-                try {
-                  await Clipboard.setData(ClipboardData(text: shareMessage));
+    // 3. Compartilha usando o Share Plus (Nativo)
+    // Adiciona um pequeno delay para garantir que o modal fechou
+    await Future.delayed(const Duration(milliseconds: 200));
 
-                  if (!ctx.mounted) return;
-                  Navigator.of(ctx).pop();
-
-                  // MUDANÇA PRINCIPAL AQUI
-                  // Usamos Get.overlayContext para garantir que temos um contexto válido
-                  // para mostrar o Toast, em vez de usar o 'context' que foi passado.
-                  final overlayContext = Get.overlayContext;
-                  if (overlayContext != null) {
-                    ToastService.showSuccess(
-                      overlayContext,
-                      'Mensagem copiada!',
-                    );
-                  }
-                } catch (e) {
-                  print("Erro ao copiar e fechar modal: $e");
-                  final overlayContext = Get.overlayContext;
-                  if (overlayContext != null) {
-                    ToastService.showError(
-                      overlayContext,
-                      'Erro ao copiar mensagem.',
-                    );
-                  }
-                }
-              },
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              icon: Icon(
-                Icons.chat_bubble_outline,
-                color: backgroundColor,
-              ), // Ícone do WhatsApp
-              label: Text(
-                'Enviar pelo WhatsApp',
-                style: TextStyle(color: backgroundColor),
-              ),
-              style: OutlinedButton.styleFrom(
-                backgroundColor: const Color(0xFF25D366), // Cor do WhatsApp
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              onPressed: () async {
-                final Uri whatsappUrl = Uri.parse(
-                  'https://wa.me/?text=${Uri.encodeComponent(shareMessage)}',
-                );
-
-                if (await canLaunchUrl(whatsappUrl)) {
-                  await launchUrl(
-                    whatsappUrl,
-                    mode: LaunchMode.externalApplication,
-                  );
-                  if (context.mounted) Navigator.of(ctx).pop();
-                } else {
-                  if (context.mounted) {
-                    final overlayContext = Get.overlayContext;
-                    Navigator.of(ctx).pop();
-                    if (overlayContext != null) {
-                      ToastService.showError(
-                        overlayContext,
-                        'Não foi possível abrir o WhatsApp.',
-                      );
-                    }
-                  }
-                }
-              },
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
+    try {
+      await Share.share(shareMessage);
+    } catch (e) {
+      print('Erro ao compartilhar: $e');
+      _showErrorToast(message: 'Erro ao abrir opções de compartilhamento');
+    }
   }
 
   void _deleteMedication(TodayDose dose) {

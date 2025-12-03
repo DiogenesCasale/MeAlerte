@@ -89,7 +89,7 @@ class Profile {
       final nascimento = DateTime.parse(dataNascimento!);
       final hoje = DateTime.now();
       int idade = hoje.year - nascimento.year;
-      if (hoje.month < nascimento.month || 
+      if (hoje.month < nascimento.month ||
           (hoje.month == nascimento.month && hoje.day < nascimento.day)) {
         idade--;
       }
@@ -107,9 +107,27 @@ class Profile {
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    return other is Profile && other.id == id;
+
+    return other is Profile &&
+        other.id == id &&
+        other.nome == nome &&
+        other.dataNascimento == dataNascimento &&
+        other.genero == genero &&
+        other.caminhoImagem == caminhoImagem &&
+        other.deletado == deletado &&
+        other.perfilPadrao == perfilPadrao &&
+        other.mensagemCompartilhar == mensagemCompartilhar;
   }
 
   @override
-  int get hashCode => id.hashCode;
+  int get hashCode {
+    return id.hashCode ^
+        nome.hashCode ^
+        dataNascimento.hashCode ^
+        genero.hashCode ^
+        caminhoImagem.hashCode ^
+        deletado.hashCode ^
+        perfilPadrao.hashCode ^
+        mensagemCompartilhar.hashCode;
+  }
 }

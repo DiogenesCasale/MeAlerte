@@ -18,7 +18,8 @@ class ThemeController extends GetxController {
   bool get isDarkMode {
     if (themeMode.value == AppThemeMode.system) {
       // Retorna o brilho atual da plataforma.
-      return SchedulerBinding.instance.platformDispatcher.platformBrightness == Brightness.dark;
+      return SchedulerBinding.instance.platformDispatcher.platformBrightness ==
+          Brightness.dark;
     } else {
       // Retorna a escolha explícita do usuário.
       return themeMode.value == AppThemeMode.dark;
@@ -28,9 +29,12 @@ class ThemeController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _loadThemeFromPrefs();
+    loadThemeFromPrefs();
     // Adiciona um listener que será notificado sempre que o tema do sistema operacional mudar.
-    SchedulerBinding.instance.platformDispatcher.onPlatformBrightnessChanged = () {
+    SchedulerBinding
+        .instance
+        .platformDispatcher
+        .onPlatformBrightnessChanged = () {
       // Se o usuário selecionou 'Padrão do Sistema', nós atualizamos o tema do app.
       if (themeMode.value == AppThemeMode.system) {
         _applyTheme();
@@ -39,10 +43,11 @@ class ThemeController extends GetxController {
   }
 
   /// Carrega a preferência de tema salva no dispositivo.
-  Future<void> _loadThemeFromPrefs() async {
+  Future<void> loadThemeFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     // Lê o índice salvo. Se não houver, usa o 'system' como padrão (índice 2).
-    final savedThemeIndex = prefs.getInt(_themeKey) ?? AppThemeMode.system.index;
+    final savedThemeIndex =
+        prefs.getInt(_themeKey) ?? AppThemeMode.system.index;
     themeMode.value = AppThemeMode.values[savedThemeIndex];
     _applyTheme();
   }
@@ -61,10 +66,10 @@ class ThemeController extends GetxController {
         modeToApply = ThemeMode.system;
         break;
     }
-    
+
     // Atualiza as cores dinâmicas globais ANTES de mudar o tema
     updateTheme(isDarkMode);
-    
+
     // NOTIFICA SISTEMA GLOBAL DE MUDANÇA DE TEMA
     try {
       final globalState = Get.find<GlobalStateController>();
@@ -74,35 +79,39 @@ class ThemeController extends GetxController {
     }
 
     // Notifica a status bar do sistema operacional
-    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
-      statusBarColor: isDarkMode ? Colors.black : Colors.white,
-      statusBarIconBrightness: isDarkMode ? Brightness.light : Brightness.dark,
-    ));
-    
+    SystemChrome.setSystemUIOverlayStyle(
+      SystemUiOverlayStyle(
+        statusBarColor: isDarkMode ? Colors.black : Colors.white,
+        statusBarIconBrightness: isDarkMode
+            ? Brightness.light
+            : Brightness.dark,
+      ),
+    );
+
     // SOLUÇÃO MAIS RADICAL: Força restart completo do GetMaterialApp
     Get.forceAppUpdate();
-    
+
     // Esta é a função correta do GetX para mudar o tema de forma reativa.
     Get.changeThemeMode(modeToApply);
-    
+
     // Força refresh dos observables
     themeMode.refresh();
-    
+
     // 'update()' notifica os widgets que usam GetBuilder sobre a mudança
     update();
-    
+
     // Múltiplos rebuilds para garantir propagação IMEDIATA
     Future.delayed(const Duration(milliseconds: 5), () {
       Get.forceAppUpdate();
       update();
       themeMode.refresh();
     });
-    
+
     Future.delayed(const Duration(milliseconds: 25), () {
       Get.forceAppUpdate();
       update();
     });
-    
+
     Future.delayed(const Duration(milliseconds: 75), () {
       update();
       themeMode.refresh();
@@ -116,7 +125,7 @@ class ThemeController extends GetxController {
     await prefs.setInt(_themeKey, mode.index);
     _applyTheme();
   }
-  
+
   /// Alterna entre os temas: Claro -> Escuro -> Sistema -> Claro...
   Future<void> toggleTheme() async {
     final nextIndex = (themeMode.value.index + 1) % AppThemeMode.values.length;

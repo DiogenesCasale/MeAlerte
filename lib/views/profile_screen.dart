@@ -10,7 +10,7 @@ import 'package:app_remedio/views/health_data/health_data_list_screen.dart';
 import 'package:app_remedio/views/medication/stock_history_screen.dart';
 import 'package:app_remedio/views/annotation/annotation_list_screen.dart';
 import 'package:app_remedio/views/backup/backup_screen.dart';
-import 'package:app_remedio/views/reports/doses_report_screen.dart';
+import 'package:app_remedio/views/reports/reports_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   final bool showBackButton;
@@ -335,7 +335,7 @@ class ProfileScreen extends StatelessWidget {
             icon: Icons.analytics,
             title: 'Relatórios',
             subtitle: 'Relatórios de medicamentos e aderência',
-            onTap: () => Get.to(() => const DosesReportScreen()),
+            onTap: () => Get.to(() => const ReportsScreen()),
           ),
           _buildDivider(),
           _buildSettingsTile(
@@ -452,5 +452,4 @@ class ProfileScreen extends StatelessWidget {
   Widget _buildDivider() {
     return Divider(height: 1, color: Colors.grey.withOpacity(0.2), indent: 60);
   }
-
 }

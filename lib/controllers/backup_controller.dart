@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:file_picker/file_picker.dart';
@@ -20,6 +21,7 @@ import 'package:app_remedio/utils/notification_service.dart';
 import 'package:app_remedio/main.dart' show SplashScreen;
 import 'package:sqflite/sqflite.dart'; // Para openDatabase
 import 'package:path/path.dart'; // Para join
+import 'package:app_remedio/controllers/theme_controller.dart';
 
 class BackupController extends GetxController {
   final DatabaseController _dbController = DatabaseController.instance;
@@ -30,7 +32,7 @@ class BackupController extends GetxController {
   Future<void> _restartApp() async {
     try {
       print('Iniciando reinicialização do app...');
-      
+
       // 1. Fecha o banco de dados primeiro
       try {
         await _dbController.close();
@@ -38,7 +40,7 @@ class BackupController extends GetxController {
       } catch (e) {
         print('Erro ao fechar banco: $e');
       }
-      
+
       // 2. Deleta todos os controllers na ordem inversa
       Get.delete<HealthDataController>(force: true);
       Get.delete<SchedulesController>(force: true);
@@ -48,36 +50,37 @@ class BackupController extends GetxController {
       Get.delete<ProfileController>(force: true);
       Get.delete<BackupController>(force: true); // Deleta ele mesmo
       // ThemeController e GlobalStateController não devem ser deletados
-      
+
       print('Controllers deletados.');
-      
+
       // 3. Aguarda um pouco para garantir que tudo foi limpo
       await Future.delayed(const Duration(milliseconds: 500));
-      
+
       // 4. Recria os controllers na ORDEM CORRETA (mesma do main.dart) COM permanent: true
       // GlobalStateController e ThemeController já existem, não recriar
       Get.put(ProfileController(), permanent: true);
       Get.put(NotificationController(), permanent: true);
       Get.put(SettingsController(), permanent: true);
-      
+
       await NotificationService().init();
-      
+
       Get.put(MedicationController(), permanent: true);
       Get.put(SchedulesController(), permanent: true);
       Get.put(HealthDataController(), permanent: true);
-      
+
       print('Controllers recriados na ordem correta com permanent: true.');
-      
+
       // 5. Aguarda mais um pouco para os controllers inicializarem
       await Future.delayed(const Duration(milliseconds: 500));
-      
+
       // 6. AGORA navega para a SplashScreen usando offAllNamed para limpar a pilha
       // mas os controllers permanent não serão deletados
-      Get.offAll(() => const SplashScreen(), 
+      Get.offAll(
+        () => const SplashScreen(),
         transition: Transition.fadeIn,
         predicate: (route) => false, // Remove todas as rotas
       );
-      
+
       print('App reiniciado com sucesso!');
     } catch (e) {
       print('Erro ao reiniciar app: $e');
@@ -99,7 +102,18 @@ class BackupController extends GetxController {
         'version': version,
         'exportDate': DateTime.now().toIso8601String(),
         'tables': {},
+        'images': {}, // Novo campo para imagens em Base64
+        'preferences': {}, // Novo campo para preferências (tema, etc)
       };
+
+      // 1. Salva Preferências (Tema)
+      final prefs = await SharedPreferences.getInstance();
+      final themeModeIndex = prefs.getInt(
+        'themeMode',
+      ); // Key do ThemeController
+      if (themeModeIndex != null) {
+        backupData['preferences']['themeMode'] = themeModeIndex;
+      }
 
       // Lista de todas as tabelas do banco
       final tables = [
@@ -121,7 +135,44 @@ class BackupController extends GetxController {
             where: 'deletado = ?',
             whereArgs: [0],
           );
-          backupData['tables']![table] = result;
+
+          // Se for a tabela de perfil, processa as imagens
+          if (table == 'tblPerfil') {
+            final profilesWithImages = <Map<String, dynamic>>[];
+
+            for (final row in result) {
+              final rowMap = Map<String, dynamic>.from(row);
+
+              // Verifica se tem imagem e se o arquivo existe
+              if (rowMap['caminhoImagem'] != null) {
+                final imagePath = rowMap['caminhoImagem'] as String;
+                final file = File(imagePath);
+
+                if (await file.exists()) {
+                  try {
+                    // Lê os bytes e converte para Base64
+                    final bytes = await file.readAsBytes();
+                    final base64Image = base64Encode(bytes);
+
+                    // Usa o nome do arquivo como chave
+                    final fileName = imagePath.split('/').last;
+                    backupData['images'][fileName] = base64Image;
+
+                    // Atualiza o caminho no backup para ser apenas o nome do arquivo
+                    // Isso facilita a restauração em diferentes diretórios
+                    rowMap['caminhoImagem'] = fileName;
+                  } catch (e) {
+                    print('Erro ao processar imagem $imagePath: $e');
+                  }
+                }
+              }
+              profilesWithImages.add(rowMap);
+            }
+            backupData['tables']![table] = profilesWithImages;
+          } else {
+            // Para outras tabelas, salva direto
+            backupData['tables']![table] = result;
+          }
         } catch (e) {
           print('Erro ao exportar tabela $table: $e');
           // Continua mesmo se uma tabela falhar
@@ -235,8 +286,29 @@ class BackupController extends GetxController {
 
       // Inicia transação
       await db.transaction((txn) async {
+        // 1. Restaura Preferências (Tema)
+        if (backupData.containsKey('preferences')) {
+          final prefsData = backupData['preferences'] as Map<String, dynamic>;
+          if (prefsData.containsKey('themeMode')) {
+            final themeModeIndex = prefsData['themeMode'] as int;
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setInt('themeMode', themeModeIndex);
+
+            // Atualiza o controller do tema se estiver ativo
+            try {
+              final themeController = Get.find<ThemeController>();
+              // Recarrega o tema das preferências para aplicar imediatamente
+              await themeController.loadThemeFromPrefs();
+            } catch (e) {
+              print('Erro ao atualizar tema: $e');
+            }
+          }
+        }
+
         // Restaura dados do backup com mapeamento de IDs
         final tablesData = backupData['tables'] as Map<String, dynamic>?;
+        final imagesData = backupData['images'] as Map<String, dynamic>?;
+
         if (tablesData == null) {
           print('Nenhum dado de tabela encontrado no backup');
           return;
@@ -277,53 +349,116 @@ class BackupController extends GetxController {
               final rowMap = Map<String, dynamic>.from(
                 row as Map<String, dynamic>,
               );
-              
+
               final oldId = rowMap['id'] as int?;
               rowMap.remove('id'); // Remove ID antigo
+
+              // Restaura Imagem de Perfil
+              if (tableName == 'tblPerfil' &&
+                  rowMap['caminhoImagem'] != null &&
+                  imagesData != null) {
+                final imageName = rowMap['caminhoImagem'] as String;
+                // O nome da imagem pode ser um caminho completo (backups antigos) ou apenas o nome (novos backups)
+                // Vamos tentar encontrar pela chave exata ou pelo basename
+                String? base64Image;
+
+                if (imagesData.containsKey(imageName)) {
+                  base64Image = imagesData[imageName];
+                } else {
+                  // Tenta pelo basename caso o backup tenha salvo o caminho completo mas a chave seja só o nome
+                  final basename = imageName.split('/').last;
+                  if (imagesData.containsKey(basename)) {
+                    base64Image = imagesData[basename];
+                  }
+                }
+
+                if (base64Image != null) {
+                  try {
+                    final bytes = base64Decode(base64Image);
+
+                    final appDir = await getApplicationDocumentsDirectory();
+                    // Gera um nome único para evitar conflitos
+                    final timestamp = DateTime.now().millisecondsSinceEpoch;
+                    // Limpa o nome do arquivo de caracteres inválidos
+                    final safeName = imageName
+                        .split('/')
+                        .last
+                        .replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '');
+                    final newFileName = 'restored_${timestamp}_$safeName';
+                    final newPath = join(appDir.path, newFileName);
+
+                    final file = File(newPath);
+                    await file.writeAsBytes(bytes);
+
+                    rowMap['caminhoImagem'] = newPath;
+                    print('Imagem restaurada para: $newPath');
+                  } catch (e) {
+                    print('Erro ao restaurar imagem $imageName: $e');
+                    rowMap['caminhoImagem'] =
+                        null; // Remove referência quebrada
+                  }
+                } else {
+                  // Se não achou a imagem, melhor limpar o caminho para não quebrar a UI
+                  rowMap['caminhoImagem'] = null;
+                }
+              }
 
               // Atualiza chaves estrangeiras com os novos IDs mapeados
               switch (tableName) {
                 case 'tblMedicamentos':
-                  if (rowMap.containsKey('idPerfil') && rowMap['idPerfil'] != null) {
+                  if (rowMap.containsKey('idPerfil') &&
+                      rowMap['idPerfil'] != null) {
                     final oldPerfilId = rowMap['idPerfil'] as int;
                     final newPerfilId = idMaps['tblPerfil']?[oldPerfilId];
                     if (newPerfilId != null) {
                       rowMap['idPerfil'] = newPerfilId;
                     } else {
-                      print('Aviso: Perfil ID $oldPerfilId não encontrado, pulando medicamento');
+                      print(
+                        'Aviso: Perfil ID $oldPerfilId não encontrado, pulando medicamento',
+                      );
                       continue; // Pula este medicamento se o perfil não existe
                     }
                   }
                   break;
 
                 case 'tblMedicamentosAgendados':
-                  if (rowMap.containsKey('idMedicamento') && rowMap['idMedicamento'] != null) {
+                  if (rowMap.containsKey('idMedicamento') &&
+                      rowMap['idMedicamento'] != null) {
                     final oldMedId = rowMap['idMedicamento'] as int;
                     final newMedId = idMaps['tblMedicamentos']?[oldMedId];
                     if (newMedId != null) {
                       rowMap['idMedicamento'] = newMedId;
                     } else {
-                      print('Aviso: Medicamento ID $oldMedId não encontrado, pulando agendamento');
+                      print(
+                        'Aviso: Medicamento ID $oldMedId não encontrado, pulando agendamento',
+                      );
                       continue;
                     }
                   }
-                  if (rowMap.containsKey('idPerfil') && rowMap['idPerfil'] != null) {
+                  if (rowMap.containsKey('idPerfil') &&
+                      rowMap['idPerfil'] != null) {
                     final oldPerfilId = rowMap['idPerfil'] as int;
                     final newPerfilId = idMaps['tblPerfil']?[oldPerfilId];
                     if (newPerfilId != null) {
                       rowMap['idPerfil'] = newPerfilId;
                     } else {
-                      print('Aviso: Perfil ID $oldPerfilId não encontrado, pulando agendamento');
+                      print(
+                        'Aviso: Perfil ID $oldPerfilId não encontrado, pulando agendamento',
+                      );
                       continue;
                     }
                   }
-                  if (rowMap.containsKey('idAgendamentoPai') && rowMap['idAgendamentoPai'] != null) {
+                  if (rowMap.containsKey('idAgendamentoPai') &&
+                      rowMap['idAgendamentoPai'] != null) {
                     final oldAgendId = rowMap['idAgendamentoPai'] as int;
-                    final newAgendId = idMaps['tblMedicamentosAgendados']?[oldAgendId];
+                    final newAgendId =
+                        idMaps['tblMedicamentosAgendados']?[oldAgendId];
                     if (newAgendId != null) {
                       rowMap['idAgendamentoPai'] = newAgendId;
                     } else {
-                      print('Aviso: Agendamento pai ID $oldAgendId não encontrado ainda');
+                      print(
+                        'Aviso: Agendamento pai ID $oldAgendId não encontrado ainda',
+                      );
                       // Não pula, apenas deixa null
                       rowMap['idAgendamentoPai'] = null;
                     }
@@ -331,85 +466,108 @@ class BackupController extends GetxController {
                   break;
 
                 case 'tblDadosSaude':
-                  if (rowMap.containsKey('idPerfil') && rowMap['idPerfil'] != null) {
+                  if (rowMap.containsKey('idPerfil') &&
+                      rowMap['idPerfil'] != null) {
                     final oldPerfilId = rowMap['idPerfil'] as int;
                     final newPerfilId = idMaps['tblPerfil']?[oldPerfilId];
                     if (newPerfilId != null) {
                       rowMap['idPerfil'] = newPerfilId;
                     } else {
-                      print('Aviso: Perfil ID $oldPerfilId não encontrado, pulando dado de saúde');
+                      print(
+                        'Aviso: Perfil ID $oldPerfilId não encontrado, pulando dado de saúde',
+                      );
                       continue;
                     }
                   }
                   break;
 
                 case 'tblDosesTomadas':
-                  if (rowMap.containsKey('idAgendamento') && rowMap['idAgendamento'] != null) {
+                  if (rowMap.containsKey('idAgendamento') &&
+                      rowMap['idAgendamento'] != null) {
                     final oldAgendId = rowMap['idAgendamento'] as int;
-                    final newAgendId = idMaps['tblMedicamentosAgendados']?[oldAgendId];
+                    final newAgendId =
+                        idMaps['tblMedicamentosAgendados']?[oldAgendId];
                     if (newAgendId != null) {
                       rowMap['idAgendamento'] = newAgendId;
                     } else {
-                      print('Aviso: Agendamento ID $oldAgendId não encontrado, pulando dose');
+                      print(
+                        'Aviso: Agendamento ID $oldAgendId não encontrado, pulando dose',
+                      );
                       continue;
                     }
                   }
-                  if (rowMap.containsKey('idPerfil') && rowMap['idPerfil'] != null) {
+                  if (rowMap.containsKey('idPerfil') &&
+                      rowMap['idPerfil'] != null) {
                     final oldPerfilId = rowMap['idPerfil'] as int;
                     final newPerfilId = idMaps['tblPerfil']?[oldPerfilId];
                     if (newPerfilId != null) {
                       rowMap['idPerfil'] = newPerfilId;
                     } else {
-                      print('Aviso: Perfil ID $oldPerfilId não encontrado, pulando dose');
+                      print(
+                        'Aviso: Perfil ID $oldPerfilId não encontrado, pulando dose',
+                      );
                       continue;
                     }
                   }
                   break;
 
                 case 'tblEstoqueMedicamento':
-                  if (rowMap.containsKey('idMedicamento') && rowMap['idMedicamento'] != null) {
+                  if (rowMap.containsKey('idMedicamento') &&
+                      rowMap['idMedicamento'] != null) {
                     final oldMedId = rowMap['idMedicamento'] as int;
                     final newMedId = idMaps['tblMedicamentos']?[oldMedId];
                     if (newMedId != null) {
                       rowMap['idMedicamento'] = newMedId;
                     } else {
-                      print('Aviso: Medicamento ID $oldMedId não encontrado, pulando estoque');
+                      print(
+                        'Aviso: Medicamento ID $oldMedId não encontrado, pulando estoque',
+                      );
                       continue;
                     }
                   }
                   break;
 
                 case 'tblNotificacoes':
-                  if (rowMap.containsKey('idPerfil') && rowMap['idPerfil'] != null) {
+                  if (rowMap.containsKey('idPerfil') &&
+                      rowMap['idPerfil'] != null) {
                     final oldPerfilId = rowMap['idPerfil'] as int;
                     final newPerfilId = idMaps['tblPerfil']?[oldPerfilId];
                     if (newPerfilId != null) {
                       rowMap['idPerfil'] = newPerfilId;
                     } else {
-                      print('Aviso: Perfil ID $oldPerfilId não encontrado, pulando notificação');
+                      print(
+                        'Aviso: Perfil ID $oldPerfilId não encontrado, pulando notificação',
+                      );
                       continue;
                     }
                   }
-                  if (rowMap.containsKey('idAgendamento') && rowMap['idAgendamento'] != null) {
+                  if (rowMap.containsKey('idAgendamento') &&
+                      rowMap['idAgendamento'] != null) {
                     final oldAgendId = rowMap['idAgendamento'] as int;
-                    final newAgendId = idMaps['tblMedicamentosAgendados']?[oldAgendId];
+                    final newAgendId =
+                        idMaps['tblMedicamentosAgendados']?[oldAgendId];
                     if (newAgendId != null) {
                       rowMap['idAgendamento'] = newAgendId;
                     } else {
-                      print('Aviso: Agendamento ID $oldAgendId não encontrado, pulando notificação');
+                      print(
+                        'Aviso: Agendamento ID $oldAgendId não encontrado, pulando notificação',
+                      );
                       continue;
                     }
                   }
                   break;
 
                 case 'tblAnotacoes':
-                  if (rowMap.containsKey('idPerfil') && rowMap['idPerfil'] != null) {
+                  if (rowMap.containsKey('idPerfil') &&
+                      rowMap['idPerfil'] != null) {
                     final oldPerfilId = rowMap['idPerfil'] as int;
                     final newPerfilId = idMaps['tblPerfil']?[oldPerfilId];
                     if (newPerfilId != null) {
                       rowMap['idPerfil'] = newPerfilId;
                     } else {
-                      print('Aviso: Perfil ID $oldPerfilId não encontrado, pulando anotação');
+                      print(
+                        'Aviso: Perfil ID $oldPerfilId não encontrado, pulando anotação',
+                      );
                       continue;
                     }
                   }
@@ -418,7 +576,7 @@ class BackupController extends GetxController {
 
               // Insere o registro e obtém o novo ID
               final newId = await txn.insert(tableName, rowMap);
-              
+
               // Armazena o mapeamento oldId -> newId
               if (oldId != null && idMaps.containsKey(tableName)) {
                 idMaps[tableName]![oldId] = newId;
@@ -440,7 +598,10 @@ class BackupController extends GetxController {
 
       final context = Get.overlayContext;
       if (context != null) {
-        ToastService.showSuccess(context, 'Backup restaurado com sucesso! Reiniciando app...');
+        ToastService.showSuccess(
+          context,
+          'Backup restaurado com sucesso! Reiniciando app...',
+        );
       }
 
       // Aguarda um pouco para o toast ser exibido
@@ -503,7 +664,9 @@ class BackupController extends GetxController {
         final isDeviceSupported = await _localAuth.isDeviceSupported();
         final availableBiometrics = await _localAuth.getAvailableBiometrics();
 
-        if (isAvailable && isDeviceSupported && availableBiometrics.isNotEmpty) {
+        if (isAvailable &&
+            isDeviceSupported &&
+            availableBiometrics.isNotEmpty) {
           final biometricResult = await _authenticateWithBiometrics();
           if (biometricResult) {
             authenticated = true;
@@ -550,7 +713,7 @@ class BackupController extends GetxController {
         // (Mostra o toast de erro no 'finally' externo)
         rethrow;
       }
-      
+
       // 3. Executar os deletes nesta conexão PRIVADA
       try {
         await privateDb.execute('PRAGMA foreign_keys = OFF');
@@ -570,11 +733,12 @@ class BackupController extends GetxController {
         for (final table in tables) {
           print('[Privado] Limpando tabela: $table...');
           final rowsDeleted = await privateDb.delete(table);
-          print('[Privado] Tabela $table limpa ($rowsDeleted linhas afetadas).');
+          print(
+            '[Privado] Tabela $table limpa ($rowsDeleted linhas afetadas).',
+          );
         }
-        
-        print('[Privado] Todas as tabelas foram limpas.');
 
+        print('[Privado] Todas as tabelas foram limpas.');
       } catch (e) {
         print('Erro ao limpar tabelas na conexão privada: $e');
         // O finally abaixo VAI rodar de qualquer jeito
@@ -585,6 +749,25 @@ class BackupController extends GetxController {
         print('Conexão privada fechada.');
       }
       // --- FIM DA CORREÇÃO ---
+
+      // 5. Limpar Preferências (Tema)
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('themeMode');
+        print('Preferências de tema limpas.');
+
+        // Reseta o ThemeController para o padrão do sistema
+        // Reseta o ThemeController para o padrão do sistema
+        try {
+          final themeController = Get.find<ThemeController>();
+          // Força o modo sistema e salva
+          await themeController.setThemeMode(AppThemeMode.system);
+        } catch (e) {
+          print('Erro ao resetar ThemeController: $e');
+        }
+      } catch (e) {
+        print('Erro ao limpar preferências: $e');
+      }
 
       print('Limpeza concluída com sucesso.');
 

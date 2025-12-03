@@ -236,11 +236,23 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
           hint: 'Ex: Olá, segue abaixo o lembrete de medicamento',
           maxLines: 3,
           validator: (v) {
-            // <-- ADICIONE ESTA PARTE
             if (v == null || v.trim().isEmpty) {
               return 'A mensagem é obrigatória';
             }
-            return null; // Retorna null se for válido
+            if (v.trim().length < 10) {
+              return 'A mensagem deve ter pelo menos 10 caracteres';
+            }
+            bool temVariavel = false;
+            for (final variavel in variaveis) {
+              if (v.contains(variavel)) {
+                temVariavel = true;
+                break;
+              }
+            }
+            if (!temVariavel) {
+              return 'A mensagem deve conter pelo menos uma variável (ex: {nomePerfil})';
+            }
+            return null;
           },
         ),
 

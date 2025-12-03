@@ -6,7 +6,8 @@ import 'package:app_remedio/controllers/report_controller.dart';
 import 'package:app_remedio/utils/constants.dart';
 
 class DosesReportScreen extends StatelessWidget {
-  const DosesReportScreen({super.key});
+  final bool isEmbedded;
+  const DosesReportScreen({super.key, this.isEmbedded = false});
 
   @override
   Widget build(BuildContext context) {
@@ -15,13 +16,15 @@ class DosesReportScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: Text('Relatório de Doses', style: heading2Style),
-        backgroundColor: backgroundColor,
-        foregroundColor: textColor,
-        centerTitle: true,
-        elevation: 0,
-      ),
+      appBar: isEmbedded
+          ? null
+          : AppBar(
+              title: Text('Relatório de Doses', style: heading2Style),
+              backgroundColor: backgroundColor,
+              foregroundColor: textColor,
+              centerTitle: true,
+              elevation: 0,
+            ),
       body: Column(
         children: [
           // Filtros de período
@@ -123,7 +126,7 @@ class DosesReportScreen extends StatelessWidget {
                           primaryColor,
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: _buildStatCard(
                           'Tomadas',
@@ -132,13 +135,22 @@ class DosesReportScreen extends StatelessWidget {
                           Colors.green,
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: _buildStatCard(
                           'Perdidas',
                           reportController.dosesMissed.value.toString(),
                           Icons.cancel,
                           Colors.red,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildStatCard(
+                          'Atrasadas',
+                          reportController.dosesLate.value.toString(),
+                          Icons.access_time,
+                          Colors.orange,
                         ),
                       ),
                     ],
@@ -404,7 +416,7 @@ class DosesReportScreen extends StatelessWidget {
     Color color,
   ) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
       decoration: BoxDecoration(
         color: color.withOpacity(0.12),
         borderRadius: BorderRadius.circular(14),
@@ -413,18 +425,18 @@ class DosesReportScreen extends StatelessWidget {
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
               color: color.withOpacity(0.15),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: color, size: 22),
+            child: Icon(icon, color: color, size: 18),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Text(
             value,
             style: TextStyle(
-              fontSize: 28,
+              fontSize: 22,
               fontWeight: FontWeight.bold,
               color: color,
               height: 1.0,
@@ -434,11 +446,12 @@ class DosesReportScreen extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: FontWeight.w600,
               color: textColor.withOpacity(0.7),
               letterSpacing: 0.3,
             ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
@@ -525,9 +538,32 @@ class DosesReportScreen extends StatelessWidget {
   }
 
   Widget _buildDoseCard(ReportData dose) {
-    final statusColor = dose.wasTaken ? Colors.green : Colors.red;
-    final statusIcon = dose.wasTaken ? Icons.check_circle : Icons.cancel;
-    final statusText = dose.wasTaken ? 'Tomada' : 'Perdida';
+    Color statusColor;
+    IconData statusIcon;
+    String statusText;
+
+    switch (dose.status) {
+      case ReportStatus.taken:
+        statusColor = Colors.green;
+        statusIcon = Icons.check_circle;
+        statusText = 'Tomada';
+        break;
+      case ReportStatus.missed:
+        statusColor = Colors.red;
+        statusIcon = Icons.cancel;
+        statusText = 'Perdida';
+        break;
+      case ReportStatus.late:
+        statusColor = Colors.orange;
+        statusIcon = Icons.access_time;
+        statusText = 'Atrasada';
+        break;
+      case ReportStatus.skipped:
+        statusColor = Colors.grey;
+        statusIcon = Icons.block;
+        statusText = 'Dispensada';
+        break;
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -636,9 +672,20 @@ class DosesReportScreen extends StatelessWidget {
                       ),
                     ],
                   ),
+                  if (dose.lateDuration != null && dose.status == ReportStatus.late) ...[
+                     const SizedBox(height: 2),
+                     Text(
+                       'Atraso de ${_formatDuration(dose.lateDuration!)}',
+                       style: TextStyle(
+                         fontSize: 11,
+                         color: Colors.orange[800],
+                         fontWeight: FontWeight.w500,
+                       ),
+                     ),
+                  ],
                   if (dose.observacao != null &&
                       dose.observacao!.isNotEmpty &&
-                      dose.observacao != 'Dose não tomada') ...[
+                      dose.observacao != 'Dose não registrada') ...[
                     const SizedBox(height: 4),
                     Text(
                       dose.observacao!,
@@ -658,6 +705,13 @@ class DosesReportScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _formatDuration(Duration d) {
+    if (d.inHours > 0) {
+      return '${d.inHours}h ${d.inMinutes % 60}min';
+    }
+    return '${d.inMinutes}min';
   }
 
   IconData _getAdherenceIcon(double rate) {
