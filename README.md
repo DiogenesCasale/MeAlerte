@@ -46,7 +46,7 @@ O objetivo principal do projeto é simplificar o gerenciamento de medicações, 
 1.  Certifique-se de ter o [Flutter](https://flutter.dev/docs/get-started/install) instalado.
 2.  Clone este repositório:
     ```bash
-    git clone [https://github.com/DiogenesCasale/MeAlerte.git](https://github.com/DiogenesCasale/MeAlerte.git)
+    git clone https://github.com/DiogenesCasale/MeAlerte.git
     ```
 3.  Entre na pasta do projeto:
     ```bash
