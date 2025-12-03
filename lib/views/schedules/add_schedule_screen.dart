@@ -31,6 +31,8 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
   final _medicationFocusNode = FocusNode();
   final GlobalKey _textFieldKey = GlobalKey();
 
+  final ScrollController _scrollController = ScrollController();
+
   Medication? _selectedMedication;
   TimeOfDay _selectedTime = TimeOfDay.now();
   OverlayEntry? _overlayEntry;
@@ -45,6 +47,15 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
   @override
   void initState() {
     super.initState();
+
+    _scrollController.addListener(() {
+      // Se o dropdown estiver visível e o usuário rolar a tela
+      if (_overlayEntry != null) {
+        _medicationFocusNode.unfocus(); // Tira o foco do campo de texto
+        _hideDropdown(); // Esconde o dropdown
+      }
+    });
+
     _medicationFocusNode.addListener(() {
       if (_medicationFocusNode.hasFocus) {
         _showDropdown();
@@ -79,6 +90,7 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
     _observacaoController.dispose();
     _medicationSearchController.dispose();
     _medicationFocusNode.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -279,10 +291,12 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
       }
     }
 
+    final doseText = _doseController.text.trim().replaceAll(',', '.');
+
     try {
       final scheduledMedication = ScheduledMedication(
         idMedicamento: _selectedMedication!.id!,
-        dose: double.parse(_doseController.text.trim()),
+        dose: double.parse(doseText),
         hora:
             '${_selectedTime.hour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')}',
         intervalo: int.parse(_intervalController.text),
@@ -290,7 +304,7 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
             ? 0
             : (_dataFim!.difference(_dataInicio!).inDays +
                   1), // Compatibilidade
-        dataInicio: _paraSempre ? null : _dataInicio!.toIso8601String(),
+        dataInicio: _dataInicio!.toIso8601String(),
         dataFim: _paraSempre ? null : _dataFim!.toIso8601String(),
         paraSempre: _paraSempre,
         observacao: _observacaoController.text.trim().isEmpty
@@ -347,6 +361,7 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
           FocusScope.of(context).unfocus(); // Remove foco de todos os campos
         },
         child: SingleChildScrollView(
+          controller: _scrollController,
           padding: const EdgeInsets.all(24.0),
           child: Form(
             key: _formKey,
@@ -415,29 +430,31 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
 
                 const SizedBox(height: 20),
 
-                WidgetsDefault.buildTextField(
-                  controller: _doseController,
-                  label: 'Dose (quantidade) *',
-                  hint: 'Ex: 1, 2, 0.5',
-                  keyboardType: TextInputType.numberWithOptions(decimal: true),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
-                      return 'Dose é obrigatória';
-                    }
-                    final dose = double.tryParse(v.trim());
-                    if (dose == null || dose <= 0) {
-                      return 'Dose deve ser um número > 0';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 20),
+                // WidgetsDefault.buildTextField(
+                //   controller: _doseController,
+                //   label: 'Dose (quantidade) *',
+                //   hint: 'Ex: 1, 2, 0.5',
+                //   keyboardType: TextInputType.numberWithOptions(decimal: true),
+                //   validator: (v) {
+                //     if (v == null || v.trim().isEmpty) {
+                //       return 'Dose é obrigatória';
+                //     }
+                //     final dose = double.tryParse(v.trim());
+                //     if (dose == null || dose <= 0) {
+                //       return 'Dose deve ser um número > 0';
+                //     }
+                //     return null;
+                //   },
+                // ),
+                // const SizedBox(height: 20),
 
-                _buildTimePicker(
-                  'Hora Início *',
-                  '${_selectedTime.hour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')}',
-                  _selectTime,
-                ),
+                // _buildTimePicker(
+                //   'Hora Início *',
+                //   '${_selectedTime.hour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')}',
+                //   _selectTime,
+                // ),
+                _buildDoseAndTimeRow(),
+
                 const SizedBox(height: 20),
 
                 _buildResponsiveIntervalFields(),
@@ -564,8 +581,8 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
           return 'Intervalo é obrigatório';
         }
         final interval = int.tryParse(v);
-        if (interval == null || interval <= 0) {
-          return 'Intervalo deve ser > 0';
+        if (interval == null || interval <= 0 || interval % 1 != 0) {
+          return 'Deve ser um número inteiro maior que 0';
         }
         return null;
       },
@@ -578,83 +595,75 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
       children: [
         Text('Duração do Tratamento *', style: heading2Style),
         const SizedBox(height: 12),
-
-        // Opção "Para Sempre"
         Container(
+          padding: const EdgeInsets.all(16.0),
           decoration: BoxDecoration(
-            color: _paraSempre
-                ? primaryColor.withOpacity(0.1)
-                : backgroundColor,
+            color: backgroundColor,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: _paraSempre ? primaryColor : textColor.withOpacity(0.3),
-              width: _paraSempre ? 2 : 1,
-            ),
+            border: Border.all(color: textColor.withOpacity(0.3)),
           ),
-          child: CheckboxListTile(
-            title: Text(
-              'Tratamento Contínuo (Para Sempre)',
-              style: TextStyle(
-                color: _paraSempre ? primaryColor : textColor,
-                fontWeight: _paraSempre ? FontWeight.w600 : FontWeight.normal,
+          child: Column(
+            children: [
+              // Data de Início (permanece igual)
+              WidgetsDefault.buildDateField(
+                label: 'Data Início',
+                value: _dataInicio,
+                onTap: () => _selectStartDate(),
+                isRequired: true,
               ),
-            ),
-            subtitle: Text(
-              'O medicamento será tomado indefinidamente',
-              style: TextStyle(color: textColor.withOpacity(0.6), fontSize: 12),
-            ),
-            value: _paraSempre,
-            onChanged: (value) {
-              setState(() {
-                _paraSempre = value ?? false;
-                if (_paraSempre) {
-                  _dataInicio = null;
-                  _dataFim = null;
-                }
-              });
-            },
-            activeColor: primaryColor,
-            controlAffinity: ListTileControlAffinity.leading,
+              const SizedBox(height: 16),
+
+              WidgetsDefault.buildDateField(
+                label: 'Data Fim',
+                value: _dataFim, // Lógica para exibir o texto
+                onTap: () => _selectEndDate(), // Desabilita o clique
+                isRequired: !_paraSempre,
+                isEnabled: !_paraSempre, // A mágica acontece aqui!
+              ),
+              const SizedBox(height: 4),
+
+              // 2. Checkbox abaixo e alinhado à direita
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end, // Alinha na direita
+                children: [
+                  InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () {
+                      setState(() {
+                        _paraSempre = !_paraSempre;
+                        if (_paraSempre) _dataFim = null;
+                      });
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4.0,
+                        vertical: 8.0,
+                      ),
+                      child: Row(
+                        children: [
+                          Checkbox(
+                            value: _paraSempre,
+                            onChanged: (value) {
+                              setState(() {
+                                _paraSempre = value ?? false;
+                                if (_paraSempre) _dataFim = null;
+                              });
+                            },
+                            activeColor: primaryColor,
+                          ),
+                          Text(
+                            'Para Sempre',
+                            style: TextStyle(color: textColor),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
-
-        if (!_paraSempre) ...[
-          const SizedBox(height: 16),
-          // Seleção de período específico
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: backgroundColor,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: textColor.withOpacity(0.3)),
-            ),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: WidgetsDefault.buildDateField(
-                        label: 'Data Início',
-                        value: _dataInicio,
-                        onTap: () => _selectStartDate(),
-                        isRequired: true,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: WidgetsDefault.buildDateField(
-                        label: 'Data Fim',
-                        value: _dataFim,
-                        onTap: () => _selectEndDate(),
-                        isRequired: true,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
       ],
     );
   }
@@ -779,5 +788,41 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
     }
   }
 
-  
+  Widget _buildDoseAndTimeRow() {
+    return Row(
+      // Alinha os widgets pelo topo, fazendo com que os labels fiquem na mesma linha
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Widget da Dose ocupando metade do espaço
+        Expanded(
+          child: WidgetsDefault.buildTextField(
+            controller: _doseController,
+            label: 'Dose *', // Label um pouco mais curto
+            hint: 'Ex: 1, 2',
+            keyboardType: TextInputType.numberWithOptions(decimal: true),
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'Dose obrigatória';
+
+              // >>> MODIFICAÇÃO AQUI <<<
+              // Substitui a vírgula por ponto para a validação
+              final doseValue = v.trim().replaceAll(',', '.');
+              final dose = double.tryParse(doseValue);
+
+              if (dose == null || dose <= 0) return 'Dose inválida';
+              return null;
+            },
+          ),
+        ),
+        const SizedBox(width: 16), // Espaçamento entre os campos
+        // Widget da Hora ocupando a outra metade do espaço
+        Expanded(
+          child: _buildTimePicker(
+            'Hora Início *',
+            '${_selectedTime.hour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')}',
+            _selectTime,
+          ),
+        ),
+      ],
+    );
+  }
 }

@@ -4,6 +4,8 @@ import 'package:get/get.dart';
 import 'package:app_remedio/controllers/database_controller.dart';
 import 'package:app_remedio/models/medication_model.dart';
 import 'package:app_remedio/controllers/profile_controller.dart';
+import 'package:app_remedio/models/stock_history_model.dart';
+import 'package:app_remedio/utils/profile_helper.dart';
 
 class MedicationController extends GetxController {
   // Instância do controlador de banco de dados
@@ -42,7 +44,7 @@ class MedicationController extends GetxController {
       ProfileController? profileController;
       int attempts = 0;
       const maxAttempts = 50; // 5 segundos máximo
-      
+
       while (profileController == null && attempts < maxAttempts) {
         try {
           profileController = Get.find<ProfileController>();
@@ -52,17 +54,17 @@ class MedicationController extends GetxController {
           attempts++;
         }
       }
-      
+
       if (profileController == null) {
         print('ProfileController não encontrado após aguardar');
         return;
       }
-      
+
       // Aguarda até o ProfileController terminar de carregar
       while (profileController.isLoading.value) {
         await Future.delayed(const Duration(milliseconds: 100));
       }
-      
+
       // Se há perfil disponível, carrega os dados
       if (profileController.currentProfile.value != null) {
         await _initializeData();
@@ -119,14 +121,18 @@ class MedicationController extends GetxController {
       final db = await _dbController.database;
       final profileController = Get.find<ProfileController>();
 
-
       if (profileController.currentProfile.value == null) {
         print('Nenhum perfil selecionado');
         isLoading.value = false;
         return;
       }
 
-      final result = await db.query('tblMedicamentos', orderBy: 'nome ASC', where: 'deletado = 0 AND idPerfil = ?', whereArgs: [profileController.currentProfile.value!.id]);
+      final result = await db.query(
+        'tblMedicamentos',
+        orderBy: 'nome ASC',
+        where: 'deletado = 0 AND idPerfil = ?',
+        whereArgs: [profileController.currentProfile.value!.id],
+      );
       final medications = result
           .map((json) => Medication.fromMap(json))
           .toList();
@@ -175,7 +181,7 @@ class MedicationController extends GetxController {
     await fetchAllMedications();
   }
 
-  Future<void> deleteMedication(int id) async {
+  Future<int> deleteMedication(int id) async {
     final db = await _dbController.database;
 
     final scheduledMedications = await db.query(
@@ -185,9 +191,7 @@ class MedicationController extends GetxController {
     );
 
     if (scheduledMedications.isNotEmpty) {
-      throw Exception(
-        'Não é possível excluir este medicamento pois existem agendamentos vinculados a ele. Exclua ou finalize os agendamentos primeiro.',
-      );
+      return 1;
     }
 
     await db.update(
@@ -197,6 +201,7 @@ class MedicationController extends GetxController {
       whereArgs: [id],
     );
     await fetchAllMedications();
+    return 0;
   }
 
   Future<Medication?> getMedicationById(int id) async {
@@ -212,5 +217,310 @@ class MedicationController extends GetxController {
       return Medication.fromMap(result.first);
     }
     return null;
+  }
+
+  Future<void> addStock(
+    int medicationId,
+    double amountToAdd, {
+    String? observacao,
+  }) async {
+    final db = await _dbController.database;
+
+    final medication = await getMedicationById(medicationId);
+    if (medication == null) {
+      throw Exception('Medicamento com ID $medicationId não encontrado.');
+    }
+
+    double newStock = medication.estoque + amountToAdd;
+    StockMovementType typeMovi;
+
+    bool isPositivo = amountToAdd > 0;
+    if (isPositivo) {
+      typeMovi = StockMovementType.entrada;
+    } else {
+      typeMovi = StockMovementType.saida;
+    }
+
+    // Atualiza o estoque na tabela principal
+    await db.update(
+      'tblMedicamentos',
+      {
+        'estoque': newStock,
+        'dataAtualizacao': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [medicationId],
+    );
+
+    // NOVO: Cria um registro no histórico de estoque
+    final historyEntry = StockHistory(
+      medicationId: medicationId,
+      profileId: ProfileHelper.currentProfileId,
+      type: typeMovi,
+      quantity: amountToAdd,
+      creationDate: DateTime.now(),
+      observacao: observacao ?? '',
+    );
+
+    await db.insert('tblEstoqueMedicamento', historyEntry.toMap());
+
+    await fetchAllMedications();
+  }
+
+  /// Reduz o estoque do medicamento pela dose tomada
+  Future<void> reduceStock(
+    int medicationId,
+    double doseAmount,
+    int takenDoseId,
+  ) async {
+    final db = await _dbController.database;
+
+    // Busca o medicamento atual
+    final medication = await getMedicationById(medicationId);
+    if (medication == null) {
+      throw Exception('Medicamento não encontrado');
+    }
+
+    // Calcula o novo estoque
+    final newStock = medication.estoque - doseAmount;
+
+    // Atualiza o estoque no banco
+    await db.update(
+      'tblMedicamentos',
+      {
+        'estoque': newStock,
+        'dataAtualizacao': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [medicationId],
+    );
+
+    // NOVO: Cria um registro no histórico de estoque
+    final historyEntry = StockHistory(
+      medicationId: medicationId,
+      profileId: ProfileHelper.currentProfileId,
+      takenDoseId: takenDoseId, // Vincula à dose tomada
+      type: StockMovementType.saida,
+      quantity: doseAmount,
+      creationDate: DateTime.now(),
+    );
+    await db.insert('tblEstoqueMedicamento', historyEntry.toMap());
+
+    // Atualiza a lista de medicamentos
+    await fetchAllMedications();
+
+    // Verifica se o estoque está baixo após a redução
+    final isLow = await isLowStock(medicationId);
+    if (isLow) {
+      final daysRemaining = await getDaysRemaining(medicationId);
+      final daysText = daysRemaining < 1
+          ? "menos de 1 dia"
+          : "${daysRemaining.toStringAsFixed(1)} dias";
+
+      print(
+        '⚠️ ALERTA: Estoque baixo do medicamento ${medication.nome}! Restam aproximadamente $daysText de uso.',
+      );
+    }
+  }
+
+  /// Busca o histórico de movimentações de estoque, com filtros opcionais.
+  Future<List<StockHistory>> getStockHistory({
+    int? medicationId,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    final db = await _dbController.database;
+    final profileId = ProfileHelper.currentProfileId;
+
+    // Query base com JOIN para buscar o nome do medicamento
+    String query = '''
+      SELECT h.*, m.nome as nomeMedicamento
+      FROM tblEstoqueMedicamento h
+      JOIN tblMedicamentos m ON h.idMedicamento = m.id
+      WHERE h.deletado = 0 AND h.idPerfil = ?
+    ''';
+
+    List<dynamic> args = [profileId];
+
+    // Adiciona filtro por ID do medicamento, se fornecido
+    if (medicationId != null) {
+      query += ' AND h.idMedicamento = ?';
+      args.add(medicationId);
+    }
+
+    // Adiciona filtro por data de início
+    if (startDate != null) {
+      // Pega o início do dia para garantir que todos os registros do dia sejam incluídos
+      final startOfDay = DateTime(
+        startDate.year,
+        startDate.month,
+        startDate.day,
+      );
+      query += ' AND h.dataCriacao >= ?';
+      args.add(startOfDay.toIso8601String());
+    }
+
+    // Adiciona filtro por data de fim
+    if (endDate != null) {
+      // Pega o final do dia (23:59:59) para incluir todos os registros do dia
+      final endOfDay = DateTime(
+        endDate.year,
+        endDate.month,
+        endDate.day,
+        23,
+        59,
+        59,
+      );
+      query += ' AND h.dataCriacao <= ?';
+      args.add(endOfDay.toIso8601String());
+    }
+
+    query += ' ORDER BY h.dataCriacao DESC';
+
+    final result = await db.rawQuery(query, args);
+
+    return result.map((map) => StockHistory.fromMap(map)).toList();
+  }
+
+  /// Reverte a redução do estoque (quando desmarcar como tomado)
+  Future<void> restoreStock(
+    int medicationId,
+    double doseAmount,
+    int takenDoseId,
+  ) async {
+    final db = await _dbController.database;
+
+    // Busca o medicamento atual
+    final medication = await getMedicationById(medicationId);
+    if (medication == null) {
+      throw Exception('Medicamento não encontrado');
+    }
+
+    // Calcula o novo estoque (restaura)
+    final newStock = medication.estoque + doseAmount;
+
+    // Atualiza o estoque no banco
+    await db.update(
+      'tblMedicamentos',
+      {
+        'estoque': newStock,
+        'dataAtualizacao': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [medicationId],
+    );
+
+    await db.update(
+      'tblEstoqueMedicamento',
+      {'deletado': 1},
+      where: 'idDoseTomada = ? AND tipo = ?',
+      whereArgs: [takenDoseId, StockMovementType.saida.name],
+    );
+
+    // Atualiza a lista de medicamentos
+    await fetchAllMedications();
+  }
+
+  /// Verifica se um medicamento está com estoque baixo baseado nos agendamentos
+  Future<bool> isLowStock(int medicationId, {int daysThreshold = 7}) async {
+    final db = await _dbController.database;
+
+    // Busca o medicamento
+    final medication = await getMedicationById(medicationId);
+    if (medication == null) return false;
+
+    // Busca todos os agendamentos ativos para este medicamento
+    final schedulesResult = await db.rawQuery(
+      '''
+      SELECT dose, intervalo, dataInicio, dataFim, paraSempre
+      FROM tblMedicamentosAgendados 
+      WHERE idMedicamento = ? AND deletado = 0
+    ''',
+      [medicationId],
+    );
+
+    if (schedulesResult.isEmpty) return false;
+
+    double totalDailyDose = 0;
+    final now = DateTime.now();
+
+    for (var schedule in schedulesResult) {
+      final dose = schedule['dose'] as double;
+      final interval = schedule['intervalo'] as int;
+      final startDate = schedule['dataInicio'] != null
+          ? DateTime.parse(schedule['dataInicio'] as String)
+          : now;
+      final endDate = schedule['dataFim'] != null
+          ? DateTime.parse(schedule['dataFim'] as String)
+          : null;
+      final isForever = (schedule['paraSempre'] as int) == 1;
+
+      // Verifica se o agendamento ainda está ativo
+      bool isActive = startDate.isBefore(now.add(Duration(days: 1)));
+      if (!isForever && endDate != null && endDate.isBefore(now)) {
+        isActive = false;
+      }
+
+      if (isActive && interval > 0) {
+        // Calcula quantas doses por dia
+        final dosesPerDay = 24 / interval;
+        totalDailyDose += dose * dosesPerDay;
+      }
+    }
+
+    // Se não há consumo diário, não há risco de acabar
+    if (totalDailyDose <= 0) return false;
+
+    // Calcula quantos dias o estoque atual durará
+    final daysRemaining = medication.estoque / totalDailyDose;
+
+    return daysRemaining <= daysThreshold;
+  }
+
+  /// Calcula quantos dias restam de medicamento baseado no uso atual
+  Future<double> getDaysRemaining(int medicationId) async {
+    final db = await _dbController.database;
+
+    final medication = await getMedicationById(medicationId);
+    if (medication == null) return 0;
+
+    final schedulesResult = await db.rawQuery(
+      '''
+      SELECT dose, intervalo, dataInicio, dataFim, paraSempre
+      FROM tblMedicamentosAgendados 
+      WHERE idMedicamento = ? AND deletado = 0
+    ''',
+      [medicationId],
+    );
+
+    if (schedulesResult.isEmpty) return double.infinity;
+
+    double totalDailyDose = 0;
+    final now = DateTime.now();
+
+    for (var schedule in schedulesResult) {
+      final dose = schedule['dose'] as double;
+      final interval = schedule['intervalo'] as int;
+      final startDate = schedule['dataInicio'] != null
+          ? DateTime.parse(schedule['dataInicio'] as String)
+          : now;
+      final endDate = schedule['dataFim'] != null
+          ? DateTime.parse(schedule['dataFim'] as String)
+          : null;
+      final isForever = (schedule['paraSempre'] as int) == 1;
+
+      bool isActive = startDate.isBefore(now.add(Duration(days: 1)));
+      if (!isForever && endDate != null && endDate.isBefore(now)) {
+        isActive = false;
+      }
+
+      if (isActive && interval > 0) {
+        final dosesPerDay = 24 / interval;
+        totalDailyDose += dose * dosesPerDay;
+      }
+    }
+
+    if (totalDailyDose <= 0) return double.infinity;
+    return medication.estoque / totalDailyDose;
   }
 }

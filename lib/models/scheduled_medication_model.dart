@@ -14,7 +14,7 @@ class ScheduledMedication {
   final bool deletado; // Soft delete
   final String? medicationName; // Para joins
   final String? caminhoImagem; // Para joins
-  // Novos campos
+  final int? idAgendamentoPai;
   final String? dataAtualizacao;
 
   ScheduledMedication({
@@ -34,6 +34,7 @@ class ScheduledMedication {
     this.deletado = false,
     this.medicationName,
     this.caminhoImagem,
+    this.idAgendamentoPai,
   });
 
   Map<String, dynamic> toMap() {
@@ -52,7 +53,13 @@ class ScheduledMedication {
       'dataCriacao': dataCriacao ?? DateTime.now().toIso8601String(),
       'dataAtualizacao': dataAtualizacao ?? DateTime.now().toIso8601String(),
       'deletado': deletado ? 1 : 0,
+      'idAgendamentoPai': idAgendamentoPai,
     };
+  }
+
+  // verificar se é um agendamento único ou seja tem um agendamento pai
+  bool get isEditedSingle {
+    return idAgendamentoPai != null;
   }
 
   static ScheduledMedication fromMap(Map<String, dynamic> map) {
@@ -71,6 +78,7 @@ class ScheduledMedication {
       dataCriacao: map['dataCriacao'],
       dataAtualizacao: map['dataAtualizacao'],
       deletado: (map['deletado'] ?? 0) == 1,
+      idAgendamentoPai: map['idAgendamentoPai'],
     );
   }
 
@@ -92,6 +100,7 @@ class ScheduledMedication {
       deletado: (map['deletado'] ?? 0) == 1,
       medicationName: map['medicationName'],
       caminhoImagem: map['caminhoImagem'],
+      idAgendamentoPai: map['idAgendamentoPai'],
     );
   }
 
@@ -115,6 +124,7 @@ class ScheduledMedication {
     bool? deletado,
     String? medicationName,
     String? caminhoImagem,
+    int? idAgendamentoPai,
   }) {
     return ScheduledMedication(
       // A lógica é: use o novo valor se ele não for nulo, senão, use o valor antigo (this.campo).
@@ -136,11 +146,12 @@ class ScheduledMedication {
       deletado: deletado ?? this.deletado,
       medicationName: medicationName ?? this.medicationName,
       caminhoImagem: caminhoImagem ?? this.caminhoImagem,
+      idAgendamentoPai: idAgendamentoPai ?? this.idAgendamentoPai,
     );
   }
 }
 
-/// Enum para representar os estados das medicações
+/// Enum para representar os estados das medicações/agendamentos
 enum MedicationStatus {
   notTaken('Não Tomado'),
   taken('Tomado'),
@@ -155,6 +166,7 @@ enum MedicationStatus {
 // Classe auxiliar para exibir medicamentos hoje
 class TodayDose {
   final int scheduledMedicationId;
+  final int idMedicamento; // ID do medicamento para redução de estoque
   final String medicationName;
   final double dose; // Quantidade numérica da dose
   final DateTime scheduledTime;
@@ -166,6 +178,7 @@ class TodayDose {
 
   TodayDose({
     required this.scheduledMedicationId,
+    required this.idMedicamento,
     required this.medicationName,
     required this.dose,
     required this.scheduledTime,
@@ -178,6 +191,7 @@ class TodayDose {
 
   TodayDose copyWith({
     int? scheduledMedicationId,
+    int? idMedicamento,
     String? medicationName,
     double? dose,
     DateTime? scheduledTime,
@@ -188,7 +202,9 @@ class TodayDose {
     int? takenDoseId,
   }) {
     return TodayDose(
-      scheduledMedicationId: scheduledMedicationId ?? this.scheduledMedicationId,
+      scheduledMedicationId:
+          scheduledMedicationId ?? this.scheduledMedicationId,
+      idMedicamento: idMedicamento ?? this.idMedicamento,
       medicationName: medicationName ?? this.medicationName,
       dose: dose ?? this.dose,
       scheduledTime: scheduledTime ?? this.scheduledTime,

@@ -44,11 +44,11 @@ class _EditMedicationScreenState extends State<EditMedicationScreen> {
 
     // Preenche os campos com os dados existentes do medicamento
     _nameController.text = widget.medication.nome;
-    _stockController.text = widget.medication.estoque.toString();
     _observacaoController.text = widget.medication.observacao ?? '';
     _selectedType = widget.medication.tipo;
     _savedImagePath = widget.medication.caminhoImagem;
     _observacaoLength = _observacaoController.text.length;
+    _stockController.text = widget.medication.estoque.toString();
 
     // Carrega a imagem existente, se houver
     if (_savedImagePath != null && _savedImagePath!.isNotEmpty) {
@@ -158,12 +158,12 @@ class _EditMedicationScreenState extends State<EditMedicationScreen> {
       ToastService.showError(context, 'É necessário selecionar um perfil primeiro.');
       return;
     }
-
+    final stockText = _stockController.text.trim().replaceAll(',', '.');
     try {
       final updatedMedication = Medication(
         id: widget.medication.id,
         nome: _nameController.text.trim(),
-        estoque: int.parse(_stockController.text.trim()),
+        estoque: double.parse(stockText),
         observacao: _observacaoController.text.trim().isEmpty
             ? null
             : _observacaoController.text.trim(),
@@ -307,7 +307,7 @@ class _EditMedicationScreenState extends State<EditMedicationScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Tipo *', style: heading2Style),
+              Text('Tipo do Medicamento *', style: heading2Style),
               const SizedBox(height: 8),
               DropdownButtonFormField<MedicationType>(
                 value: _selectedType,
@@ -337,10 +337,10 @@ class _EditMedicationScreenState extends State<EditMedicationScreen> {
             label: 'Estoque *',
             hint: 'Ex: 30',
             keyboardType: TextInputType.number,
-            suffixText: _selectedType.unit,
             validator: (v) {
               if (v == null || v.trim().isEmpty) return 'Obrigatório';
-              final stock = int.tryParse(v);
+              final stockValue = v.trim().replaceAll(',', '.');
+              final stock = double.tryParse(stockValue);
               if (stock == null || stock < 0) return 'Inválido';
               return null;
             },

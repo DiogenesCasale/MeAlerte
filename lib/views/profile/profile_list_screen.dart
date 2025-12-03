@@ -37,15 +37,19 @@ class ProfileListScreen extends StatelessWidget {
           return const Center(child: CircularProgressIndicator());
         }
 
+        // 1. Se a lista TOTAL estiver vazia, mostre o empty state
+        if (profileController.profiles.isEmpty) {
+          return _buildEmptyState();
+        }
+
+        // 2. Se houver perfis, mostre o header e a seção de "outros perfis"
         return Column(
           children: [
-            // Header com perfil atual
+            // Header com perfil atual (sempre exibido se houver perfis)
             _buildCurrentProfileHeader(profileController),
-            
-            // Lista de perfis
-            Expanded(
-              child: _buildProfilesList(profileController),
-            ),
+
+            // Nova seção que contém a lista filtrada
+            _buildOtherProfilesSection(profileController),
           ],
         );
       }),
@@ -59,7 +63,7 @@ class ProfileListScreen extends StatelessWidget {
 
   Widget _buildCurrentProfileHeader(ProfileController controller) {
     final currentProfile = controller.currentProfile.value;
-    
+
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(20),
@@ -72,26 +76,23 @@ class ProfileListScreen extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(
-                Icons.person,
-                color: primaryColor,
-                size: 20,
-              ),
+              Icon(Icons.person, color: primaryColor, size: 20),
               const SizedBox(width: 8),
-               Text(
-                 'Perfil Atual',
-                 style: TextStyle(
-                   fontSize: 16, 
-                   fontWeight: FontWeight.w600, 
-                   color: primaryColor,
-                 ),
-               ),
+              Text(
+                'Perfil Atual',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: primaryColor,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
-          
           if (currentProfile != null) ...[
             Row(
+              // Alinha os itens da Row (imagem, texto, botões)
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 ProfileImageWidget(
                   imagePath: currentProfile.caminhoImagem,
@@ -102,131 +103,223 @@ class ProfileListScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                       Text(
-                         currentProfile.nome,
-                         style: TextStyle(
-                           fontSize: 18, 
-                           fontWeight: FontWeight.w600, 
-                           color: textColor,
-                         ),
-                       ),
-                       if (currentProfile.idade != null) ...[
-                         const SizedBox(height: 4),
-                         Text(
-                           '${currentProfile.idade} anos',
-                           style: TextStyle(
-                             fontSize: 14,
-                             color: textColor.withOpacity(0.7),
-                           ),
-                         ),
-                       ],
+                      Text(
+                        currentProfile.nome,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: textColor,
+                        ),
+                      ),
+                      if (currentProfile.idade != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          '${currentProfile.idade} anos',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: textColor.withOpacity(0.7),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
-                Icon(
-                  Icons.check_circle,
-                  color: primaryColor,
-                  size: 24,
+
+                // --- INÍCIO DA MODIFICAÇÃO ---
+                // Substituímos o Icon(check) por uma Coluna
+                // para agrupar o "check" e o "editar"
+                const SizedBox(width: 8), // Espaço antes dos botões
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.check_circle, color: primaryColor, size: 24),
+                    const SizedBox(height: 10), // Espaço entre os ícones
+                    // Botão de Editar
+                    InkWell(
+                      onTap: () {
+                        // Navega para a tela de edição passando o perfil atual
+                        Get.to(
+                          () =>
+                              EditProfileScreen(profileInitial: currentProfile),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(20),
+                      child: Padding(
+                        padding: const EdgeInsets.all(4.0), // Área de clique
+                        child: Icon(
+                          Icons.edit_outlined, // Ícone de editar
+                          color: textColor.withOpacity(0.7),
+                          size: 22,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
+                // --- FIM DA MODIFICAÇÃO ---
               ],
             ),
-           ] else ...[
-             Text(
-               'Nenhum perfil selecionado',
-               style: TextStyle(
-                 fontSize: 16,
-                 color: textColor.withOpacity(0.6),
-                 fontStyle: FontStyle.italic,
-               ),
-             ),
-           ],
+          ] else ...[
+            Text(
+              'Nenhum perfil selecionado',
+              style: TextStyle(
+                fontSize: 16,
+                color: textColor.withOpacity(0.6),
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildProfilesList(ProfileController controller) {
-    if (controller.profiles.isEmpty) {
-      return _buildEmptyState();
+  // NOVO WIDGET: Seção "Outros Perfis"
+  Widget _buildOtherProfilesSection(ProfileController controller) {
+    // Filtra a lista para pegar TODOS, EXCETO o perfil atual
+    final currentProfileId = controller.currentProfile.value?.id;
+    final otherProfiles = controller.profiles
+        .where((p) => p.id != currentProfileId)
+        .toList();
+
+    // Se não houver outros perfis (ou seja, só existe 1 perfil no total)
+    if (otherProfiles.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: Center(
+          child: Text(
+            'Não há outros perfis para gerenciar.',
+            style: TextStyle(
+              fontSize: 15,
+              color: textColor.withOpacity(0.6),
+              fontStyle: FontStyle.italic,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
     }
+
+    // Se houver, mostra o título e a lista filtrada
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+            child: Text(
+              'Outros Perfis',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: textColor,
+              ),
+            ),
+          ),
+          Expanded(
+            // Passa a lista JÁ FILTRADA para o _buildProfilesList
+            child: _buildProfilesList(controller, otherProfiles),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // WIDGET MODIFICADO: Agora recebe a lista de perfis
+  Widget _buildProfilesList(
+    ProfileController controller,
+    List<dynamic> profiles,
+  ) {
+    // A verificação de lista vazia foi movida para o widget 'build' e '_buildOtherProfilesSection'
+    // Esta lista agora contém APENAS os "outros perfis"
 
     return ListView.separated(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: controller.profiles.length,
+      itemCount: profiles.length,
       separatorBuilder: (context, index) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
-        final profile = controller.profiles[index];
-        final isCurrentProfile = controller.currentProfile.value?.id == profile.id;
-        
+        final profile = profiles[index];
+
+        // Como esta lista SÓ TEM os "outros perfis",
+        // 'isCurrentProfile' será sempre falso aqui.
+        const bool isCurrentProfile = false;
+
         return _buildProfileCard(profile, isCurrentProfile, controller);
       },
     );
   }
 
+  // Seu widget _buildProfileCard original (sem alterações)
   Widget _buildProfileCard(
-    dynamic profile, 
-    bool isCurrentProfile, 
+    dynamic profile,
+    bool isCurrentProfile,
     ProfileController controller,
   ) {
+    // ... (coloquei o seu código original aqui)
     return Card(
       elevation: isCurrentProfile ? 4 : 2,
       color: surfaceColor,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: isCurrentProfile 
-          ? BorderSide(color: primaryColor, width: 2)
-          : BorderSide.none,
+        side: isCurrentProfile
+            ? BorderSide(color: primaryColor, width: 2)
+            : BorderSide.none,
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
-        leading: ProfileImageWidget(
-          imagePath: profile.caminhoImagem,
-          size: 50,
+        leading: ProfileImageWidget(imagePath: profile.caminhoImagem, size: 50),
+        title: Text(
+          profile.nome,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: isCurrentProfile ? primaryColor : textColor,
+          ),
         ),
-         title: Text(
-           profile.nome,
-           style: TextStyle(
-             fontSize: 16, 
-             fontWeight: FontWeight.w600, 
-             color: isCurrentProfile ? primaryColor : textColor,
-           ),
-         ),
-         subtitle: Column(
-           crossAxisAlignment: CrossAxisAlignment.start,
-           children: [
-             if (profile.idade != null) ...[
-               const SizedBox(height: 4),
-               Text(
-                 '${profile.idade} anos',
-                 style: TextStyle(
-                   fontSize: 14,
-                   color: textColor.withOpacity(0.7),
-                 ),
-               ),
-             ],
-             if (isCurrentProfile) ...[
-               const SizedBox(height: 4),
-               Row(
-                 children: [
-                   Icon(
-                     Icons.check_circle,
-                     size: 16,
-                     color: primaryColor,
-                   ),
-                   const SizedBox(width: 4),
-                   Text(
-                     'Perfil Atual',
-                     style: TextStyle(
-                       fontSize: 12,
-                       color: primaryColor,
-                       fontWeight: FontWeight.w600,
-                     ),
-                   ),
-                 ],
-               ),
-             ],
-           ],
-         ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (profile.idade != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                '${profile.idade} anos',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: textColor.withOpacity(0.7),
+                ),
+              ),
+            ],
+            // Esta lógica de 'isCurrentProfile' nunca será
+            // verdadeira aqui, o que é o correto.
+            if (isCurrentProfile) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(Icons.check_circle, size: 16, color: primaryColor),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Perfil Atual',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: primaryColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            if (profile.perfilPadrao) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Perfil Padrão',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: primaryColor,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ],
+        ),
         trailing: PopupMenuButton<String>(
           icon: Icon(Icons.more_vert, color: textColor),
           onSelected: (value) async {
@@ -237,7 +330,7 @@ class ProfileListScreen extends StatelessWidget {
                 }
                 break;
               case 'edit':
-                Get.to(() => EditProfileScreen(profile: profile));
+                Get.to(() => EditProfileScreen(profileInitial: profile));
                 break;
               case 'delete':
                 await controller.deleteProfile(profile);
@@ -273,17 +366,17 @@ class ProfileListScreen extends StatelessWidget {
                 children: [
                   Icon(
                     Icons.delete,
-                    color: controller.profiles.length > 1 
-                      ? Colors.red 
-                      : Colors.grey,
+                    color: controller.profiles.length > 1
+                        ? Colors.red
+                        : Colors.grey,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     'Excluir',
                     style: TextStyle(
-                      color: controller.profiles.length > 1 
-                        ? Colors.red 
-                        : Colors.grey,
+                      color: controller.profiles.length > 1
+                          ? Colors.red
+                          : Colors.grey,
                     ),
                   ),
                 ],
@@ -300,32 +393,25 @@ class ProfileListScreen extends StatelessWidget {
     );
   }
 
+  // Seu widget _buildEmptyState original (sem alterações)
   Widget _buildEmptyState() {
+    // ... (coloquei o seu código original aqui)
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.group_off,
-            size: 80,
-            color: textColor.withOpacity(0.5),
-          ),
+          Icon(Icons.group_off, size: 80, color: textColor.withOpacity(0.5)),
           const SizedBox(height: 16),
           Text(
             'Nenhum perfil encontrado',
-            style: heading2Style.copyWith(
-              color: textColor.withOpacity(0.7),
-            ),
+            style: heading2Style.copyWith(color: textColor.withOpacity(0.7)),
           ),
           const SizedBox(height: 8),
-           Text(
-             'Crie seu primeiro perfil para começar',
-             style: TextStyle(
-               fontSize: 16,
-               color: textColor.withOpacity(0.6),
-             ),
-             textAlign: TextAlign.center,
-           ),
+          Text(
+            'Crie seu primeiro perfil para começar',
+            style: TextStyle(fontSize: 16, color: textColor.withOpacity(0.6)),
+            textAlign: TextAlign.center,
+          ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
             onPressed: () => Get.to(() => const AddProfileScreen()),

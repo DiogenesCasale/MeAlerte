@@ -1,0 +1,410 @@
+import 'package:path/path.dart';
+import 'package:sqflite/sqflite.dart';
+
+class DatabaseController {
+  // --- Configuração do Singleton ---
+  static final DatabaseController instance = DatabaseController._init();
+  static Database? _database;
+  DatabaseController._init();
+
+  // --- Getter principal para o banco de dados ---
+  Future<Database> get database async {
+    if (_database != null) return _database!;
+    _database = await _initDB('app_remedio_v4.db');
+    return _database!;
+  }
+
+  // --- Inicialização e criação das tabelas ---
+  Future<Database> _initDB(String filePath) async {
+    final dbPath = await getDatabasesPath();
+    final path = join(dbPath, filePath);
+    return await openDatabase(
+      path,
+      version: 4,
+      onCreate: (db, version) async {
+        await _createDBSchemaV1(db);
+        await _onUpgrade(db, 1, version);
+      },
+      onUpgrade: _onUpgrade,
+    );
+  }
+
+  Future _createDBSchemaV1(Database db) async {
+    await db.execute('''
+      CREATE TABLE tblMedicamentos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL,
+        quantidade INTEGER NOT NULL CHECK(quantidade >= 0),
+        observacao TEXT,
+        data_criacao TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE tblMedicamentosAgendados (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        hora TEXT NOT NULL,
+        dose REAL NOT NULL CHECK(dose > 0),
+        intervalo INTEGER NOT NULL,
+        dias INTEGER NOT NULL CHECK(dias >= 0),
+        observacao TEXT,
+        medicamento_id INTEGER NOT NULL,
+        data_criacao TEXT NOT NULL,
+        FOREIGN KEY (medicamento_id) REFERENCES tblMedicamentos (id) ON DELETE CASCADE
+      )
+    ''');
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    print(
+      "Executando migração do banco de dados da versão $oldVersion para $newVersion...",
+    );
+
+    for (int version = oldVersion + 1; version <= newVersion; version++) {
+      print("Aplicando migração para a versão $version...");
+      switch (version) {
+        case 2:
+          await _migrateToV2(db);
+          break;
+        case 3:
+          await _migrateToV3(db);
+          break;
+        case 4:
+          await _migrateToV4(db);
+          break;
+        // Removido case 5 até que a migração para v5 seja implementada
+      }
+    }
+
+    print("Migração do banco de dados concluída com sucesso.");
+  }
+
+  Future<void> _migrateToV2(Database db) async {
+    final batch = db.batch();
+
+    print("Migração da v1 para v2...");
+
+    // 1. Selecionar os dados existentes da tblMedicamentos
+    List<Map<String, dynamic>> dadosMedicamentos = await db.rawQuery(
+      'SELECT * FROM tblMedicamentos;',
+    );
+
+    // 2. Dropar a tabela tblMedicamentos
+    batch.execute('DROP TABLE IF EXISTS tblMedicamentos;');
+
+    // 3. Recriar a tabela tblMedicamentos com a nova estrutura
+    batch.execute('''
+      CREATE TABLE tblMedicamentos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL,
+        estoque INTEGER NOT NULL DEFAULT 0,
+        tipo TEXT NOT NULL DEFAULT 'comprimido',
+        deletado INTEGER DEFAULT 0,
+        idPerfil INTEGER NOT NULL DEFAULT 1,
+        caminhoImagem TEXT NULL,
+        observacao TEXT,
+        dataCriacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        dataAtualizacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        -- FOREIGN KEY (idPerfil) será adicionada na v3, após criação de tblPerfil
+      )
+    ''');
+
+    // 4. Transferir os dados para a nova tabela tblMedicamentos
+    for (var dadosMedicamento in dadosMedicamentos) {
+      batch.execute(
+        '''
+        INSERT INTO tblMedicamentos (id, nome, estoque, tipo, deletado, idPerfil, caminhoImagem, observacao, dataCriacao, dataAtualizacao)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''',
+        [
+          dadosMedicamento['id'],
+          dadosMedicamento['nome'],
+          dadosMedicamento['quantidade'],
+          'comprimido',
+          0,
+          1,
+          null,
+          dadosMedicamento['observacao'],
+          dadosMedicamento['data_criacao'],
+          dadosMedicamento['data_criacao'],
+        ],
+      );
+    }
+
+    // 5. Selecionar os dados existentes da tblMedicamentosAgendados
+    List<Map<String, dynamic>> dadosMedicamentosAgendados = await db.rawQuery(
+      'SELECT * FROM tblMedicamentosAgendados;',
+    );
+
+    // 6. Dropar a tabela tblMedicamentosAgendados
+    batch.execute('DROP TABLE IF EXISTS tblMedicamentosAgendados;');
+
+    // 7. Recriar a tabela tblMedicamentosAgendados com a nova estrutura
+    batch.execute('''
+      CREATE TABLE tblMedicamentosAgendados (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        hora TEXT NOT NULL,
+        dose REAL NOT NULL CHECK(dose > 0),
+        intervalo INTEGER NOT NULL,
+        dias INTEGER NOT NULL CHECK(dias >= 0),
+        deletado INTEGER DEFAULT 0,
+        observacao TEXT,
+        idMedicamento INTEGER NOT NULL,
+        idPerfil INTEGER NOT NULL DEFAULT 1,
+        dataInicio TEXT NULL,
+        dataFim TEXT NULL,
+        paraSempre INTEGER DEFAULT 0,
+        dataCriacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        dataAtualizacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (idMedicamento) REFERENCES tblMedicamentos (id) ON DELETE CASCADE
+        -- FOREIGN KEY (idPerfil) será adicionada na v3, após criação de tblPerfil
+      )
+    ''');
+
+    // 8. Transferir os dados para a nova tabela tblMedicamentosAgendados
+    for (var dadosMedicamentoAgendado in dadosMedicamentosAgendados) {
+      batch.execute(
+        '''
+        INSERT INTO tblMedicamentosAgendados (id, hora, dose, intervalo, dias, deletado, observacao, idMedicamento, idPerfil, dataInicio, dataFim, paraSempre, dataCriacao, dataAtualizacao)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''',
+        [
+          dadosMedicamentoAgendado['id'],
+          dadosMedicamentoAgendado['hora'],
+          dadosMedicamentoAgendado['dose'],
+          dadosMedicamentoAgendado['intervalo'],
+          dadosMedicamentoAgendado['dias'],
+          0,
+          dadosMedicamentoAgendado['observacao'],
+          dadosMedicamentoAgendado['medicamento_id'],
+          1,
+          null,
+          null,
+          0,
+          dadosMedicamentoAgendado['data_criacao'],
+          dadosMedicamentoAgendado['data_criacao'],
+        ],
+      );
+    }
+
+    // 9. Triggers para atualização das colunas dataAtualizacao
+    batch.execute('''
+      CREATE TRIGGER updateDataAtualizacaoMedicamentos
+      AFTER UPDATE ON tblMedicamentos
+      FOR EACH ROW
+      BEGIN
+        UPDATE tblMedicamentos
+        SET dataAtualizacao = CURRENT_TIMESTAMP
+        WHERE id = OLD.id;
+      END;
+    ''');
+
+    batch.execute('''
+      CREATE TRIGGER updateDataAtualizacaoAgendamentos
+      AFTER UPDATE ON tblMedicamentosAgendados
+      FOR EACH ROW
+      BEGIN
+        UPDATE tblMedicamentosAgendados
+        SET dataAtualizacao = CURRENT_TIMESTAMP
+        WHERE id = OLD.id;
+      END;
+    ''');
+
+    try {
+      await batch.commit();
+      print("Migração v1 para v2 concluída com sucesso.");
+    } catch (e) {
+      print("Erro na migração v1 para v2: $e");
+      rethrow;
+    }
+  }
+
+  Future<void> _migrateToV3(Database db) async {
+    final batch = db.batch();
+
+    // Cria a nova tabela de perfil
+    batch.execute('''
+      CREATE TABLE tblPerfil (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL,
+        dataNascimento TEXT NULL,
+        genero TEXT NULL,
+        caminhoImagem TEXT NULL,
+        deletado INTEGER DEFAULT 0,
+        dataCriacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        dataAtualizacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    ''');
+
+    // Insere um perfil padrão com id = 1 para suportar o valor padrão de idPerfil
+    batch.execute(
+      '''
+      INSERT INTO tblPerfil (id, nome, dataCriacao, dataAtualizacao)
+      VALUES (?, ?, ?, ?)
+      ''',
+      [1, 'Padrão', DateTime.now().toIso8601String(), DateTime.now().toIso8601String()],
+    );
+
+    // Adiciona chaves estrangeiras para idPerfil em tblMedicamentos e tblMedicamentosAgendados
+    batch.execute('''
+      CREATE TABLE tblMedicamentos_temp (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL,
+        estoque INTEGER NOT NULL DEFAULT 0,
+        tipo TEXT NOT NULL DEFAULT 'comprimido',
+        deletado INTEGER DEFAULT 0,
+        idPerfil INTEGER NOT NULL DEFAULT 1,
+        caminhoImagem TEXT NULL,
+        observacao TEXT,
+        dataCriacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        dataAtualizacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (idPerfil) REFERENCES tblPerfil (id) ON DELETE CASCADE
+      )
+    ''');
+
+    batch.execute('''
+      INSERT INTO tblMedicamentos_temp (id, nome, estoque, tipo, deletado, idPerfil, caminhoImagem, observacao, dataCriacao, dataAtualizacao)
+      SELECT id, nome, estoque, tipo, deletado, idPerfil, caminhoImagem, observacao, dataCriacao, dataAtualizacao
+      FROM tblMedicamentos
+    ''');
+
+    batch.execute('DROP TABLE IF EXISTS tblMedicamentos;');
+    batch.execute('ALTER TABLE tblMedicamentos_temp RENAME TO tblMedicamentos;');
+
+    batch.execute('''
+      CREATE TABLE tblMedicamentosAgendados_temp (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        hora TEXT NOT NULL,
+        dose REAL NOT NULL CHECK(dose > 0),
+        intervalo INTEGER NOT NULL,
+        dias INTEGER NOT NULL CHECK(dias >= 0),
+        deletado INTEGER DEFAULT 0,
+        observacao TEXT,
+        idMedicamento INTEGER NOT NULL,
+        idPerfil INTEGER NOT NULL DEFAULT 1,
+        dataInicio TEXT NULL,
+        dataFim TEXT NULL,
+        paraSempre INTEGER DEFAULT 0,
+        dataCriacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        dataAtualizacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (idMedicamento) REFERENCES tblMedicamentos (id) ON DELETE CASCADE,
+        FOREIGN KEY (idPerfil) REFERENCES tblPerfil (id) ON DELETE CASCADE
+      )
+    ''');
+
+    batch.execute('''
+      INSERT INTO tblMedicamentosAgendados_temp (id, hora, dose, intervalo, dias, deletado, observacao, idMedicamento, idPerfil, dataInicio, dataFim, paraSempre, dataCriacao, dataAtualizacao)
+      SELECT id, hora, dose, intervalo, dias, deletado, observacao, idMedicamento, idPerfil, dataInicio, dataFim, paraSempre, dataCriacao, dataAtualizacao
+      FROM tblMedicamentosAgendados
+    ''');
+
+    batch.execute('DROP TABLE IF EXISTS tblMedicamentosAgendados;');
+    batch.execute('ALTER TABLE tblMedicamentosAgendados_temp RENAME TO tblMedicamentosAgendados;');
+
+    // Cria a nova tabela de dados de saúde
+    batch.execute('''
+      CREATE TABLE tblDadosSaude (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        idPerfil INTEGER NOT NULL,
+        tipo TEXT NOT NULL,
+        valor REAL NULL,
+        valorSistolica REAL NULL,
+        valorDiastolica REAL NULL,
+        unidade TEXT NULL,
+        observacao TEXT NULL,
+        dataRegistro TEXT NOT NULL,
+        deletado INTEGER DEFAULT 0,
+        dataCriacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        dataAtualizacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (idPerfil) REFERENCES tblPerfil (id) ON DELETE CASCADE
+      )
+    ''');
+
+    // Triggers para atualização das colunas dataAtualizacao
+    batch.execute('''
+      CREATE TRIGGER updateDataAtualizacaoPerfil
+      AFTER UPDATE ON tblPerfil
+      FOR EACH ROW
+      BEGIN
+        UPDATE tblPerfil
+        SET dataAtualizacao = CURRENT_TIMESTAMP
+        WHERE id = OLD.id;
+      END;
+    ''');
+
+    batch.execute('''
+      CREATE TRIGGER updateDataAtualizacaoDadosSaude
+      AFTER UPDATE ON tblDadosSaude
+      FOR EACH ROW
+      BEGIN
+        UPDATE tblDadosSaude
+        SET dataAtualizacao = CURRENT_TIMESTAMP
+        WHERE id = OLD.id;
+      END;
+    ''');
+
+    try {
+      await batch.commit();
+      print("Migração v2 para v3 concluída com sucesso.");
+    } catch (e) {
+      print("Erro na migração v2 para v3: $e");
+      rethrow;
+    }
+  }
+
+  Future<void> _migrateToV4(Database db) async {
+    final batch = db.batch();
+
+    // Cria a tabela de doses tomadas
+    batch.execute('''
+      CREATE TABLE tblDosesTomadas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        idAgendamento INTEGER NOT NULL,
+        idPerfil INTEGER NOT NULL DEFAULT 1,
+        dataTomada TEXT NOT NULL,
+        horarioTomada TEXT NOT NULL,
+        horarioAgendado TEXT NOT NULL,
+        observacao TEXT,
+        deletado INTEGER DEFAULT 0,
+        dataCriacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        dataAtualizacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (idAgendamento) REFERENCES tblMedicamentosAgendados (id) ON DELETE CASCADE,
+        FOREIGN KEY (idPerfil) REFERENCES tblPerfil (id) ON DELETE CASCADE
+      )
+    ''');
+
+    // Cria o trigger para atualização da coluna dataAtualizacao
+    batch.execute('''
+      CREATE TRIGGER updateDataAtualizacaoDosesTomadas
+      AFTER UPDATE ON tblDosesTomadas
+      FOR EACH ROW
+      BEGIN
+        UPDATE tblDosesTomadas
+        SET dataAtualizacao = CURRENT_TIMESTAMP
+        WHERE id = OLD.id;
+      END;
+    ''');
+
+    try {
+      await batch.commit();
+      print("Migração v3 para v4 concluída com sucesso.");
+    } catch (e) {
+      print("Erro na migração v3 para v4: $e");
+      rethrow;
+    }
+  }
+
+  Future<void> _migrateToV5(Database db) async {
+    final batch = db.batch();
+    // INCREMENTO 3 DO PROJETO
+    // Adicione aqui as alterações necessárias para a versão 5
+
+    try {
+      await batch.commit();
+      print("Migração v4 para v5 concluída com sucesso.");
+    } catch (e) {
+      print("Erro na migração v4 para v5: $e");
+      rethrow;
+    }
+  }
+}

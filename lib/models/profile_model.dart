@@ -3,22 +3,24 @@ class Profile {
   final String nome;
   final String? dataNascimento;
   final String? genero;
-  final double? peso;
   final String? caminhoImagem;
   final bool deletado;
   final String? dataCriacao;
   final String? dataAtualizacao;
+  final bool perfilPadrao;
+  final String? mensagemCompartilhar;
 
   Profile({
     this.id,
     required this.nome,
     this.dataNascimento,
     this.genero,
-    this.peso,
     this.caminhoImagem,
     this.deletado = false,
     this.dataCriacao,
     this.dataAtualizacao,
+    this.perfilPadrao = false,
+    this.mensagemCompartilhar,
   });
 
   static Profile fromMap(Map<String, dynamic> map) {
@@ -27,11 +29,12 @@ class Profile {
       nome: map['nome'],
       dataNascimento: map['dataNascimento'],
       genero: map['genero'],
-      peso: map['peso']?.toDouble(),
       caminhoImagem: map['caminhoImagem'],
       deletado: (map['deletado'] ?? 0) == 1,
       dataCriacao: map['data_criacao'] ?? map['dataCriacao'],
       dataAtualizacao: map['data_atualizacao'] ?? map['dataAtualizacao'],
+      perfilPadrao: (map['perfilPadrao'] ?? 0) == 1,
+      mensagemCompartilhar: map['mensagemCompartilhar'],
     );
   }
 
@@ -41,11 +44,12 @@ class Profile {
       'nome': nome,
       'dataNascimento': dataNascimento,
       'genero': genero,
-      'peso': peso,
       'deletado': deletado ? 1 : 0,
       'caminhoImagem': caminhoImagem,
       'dataCriacao': dataCriacao ?? DateTime.now().toIso8601String(),
       'dataAtualizacao': DateTime.now().toIso8601String(),
+      'perfilPadrao': perfilPadrao ? 1 : 0,
+      'mensagemCompartilhar': mensagemCompartilhar,
     };
   }
 
@@ -54,22 +58,24 @@ class Profile {
     String? nome,
     String? dataNascimento,
     String? genero,
-    double? peso,
     String? caminhoImagem,
     bool? deletado,
     String? dataCriacao,
     String? dataAtualizacao,
+    bool? perfilPadrao,
+    String? mensagemCompartilhar,
   }) {
     return Profile(
       id: id ?? this.id,
       nome: nome ?? this.nome,
       dataNascimento: dataNascimento ?? this.dataNascimento,
       genero: genero ?? this.genero,
-      peso: peso ?? this.peso,
       caminhoImagem: caminhoImagem ?? this.caminhoImagem,
       deletado: deletado ?? this.deletado,
       dataCriacao: dataCriacao ?? this.dataCriacao,
       dataAtualizacao: dataAtualizacao ?? this.dataAtualizacao,
+      perfilPadrao: perfilPadrao ?? this.perfilPadrao,
+      mensagemCompartilhar: mensagemCompartilhar ?? this.mensagemCompartilhar,
     );
   }
 
@@ -83,7 +89,7 @@ class Profile {
       final nascimento = DateTime.parse(dataNascimento!);
       final hoje = DateTime.now();
       int idade = hoje.year - nascimento.year;
-      if (hoje.month < nascimento.month || 
+      if (hoje.month < nascimento.month ||
           (hoje.month == nascimento.month && hoje.day < nascimento.day)) {
         idade--;
       }
@@ -95,15 +101,33 @@ class Profile {
 
   @override
   String toString() {
-    return 'Profile(id: $id, nome: $nome, dataNascimento: $dataNascimento, genero: $genero, peso: $peso, caminhoImagem: $caminhoImagem, deletado: $deletado)';
+    return 'Profile(id: $id, nome: $nome, dataNascimento: $dataNascimento, genero: $genero, caminhoImagem: $caminhoImagem, deletado: $deletado, perfilPadrao: $perfilPadrao, mensagemCompartilhar: $mensagemCompartilhar)';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    return other is Profile && other.id == id;
+
+    return other is Profile &&
+        other.id == id &&
+        other.nome == nome &&
+        other.dataNascimento == dataNascimento &&
+        other.genero == genero &&
+        other.caminhoImagem == caminhoImagem &&
+        other.deletado == deletado &&
+        other.perfilPadrao == perfilPadrao &&
+        other.mensagemCompartilhar == mensagemCompartilhar;
   }
 
   @override
-  int get hashCode => id.hashCode;
+  int get hashCode {
+    return id.hashCode ^
+        nome.hashCode ^
+        dataNascimento.hashCode ^
+        genero.hashCode ^
+        caminhoImagem.hashCode ^
+        deletado.hashCode ^
+        perfilPadrao.hashCode ^
+        mensagemCompartilhar.hashCode;
+  }
 }

@@ -4,8 +4,6 @@ import 'package:app_remedio/views/medication/medication_list_screen.dart';
 import 'package:app_remedio/views/profile_screen.dart';
 import 'package:app_remedio/controllers/profile_controller.dart';
 import 'package:app_remedio/widgets/bottom_navigation_widget.dart';
-import 'package:app_remedio/views/profile/profile_list_screen.dart';
-import 'package:app_remedio/views/profile_screen.dart';
 import 'package:get/get.dart';
 
 class MainLayout extends StatefulWidget {
@@ -38,10 +36,6 @@ class _MainLayoutState extends State<MainLayout> {
   void initState() {
     super.initState();
 
-    // SUBSTITUA a chamada direta...
-    // _checkProfile(); // <-- Linha problemática
-
-    // ...POR esta chamada agendada:
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkProfile();
     });
@@ -56,19 +50,34 @@ class _MainLayoutState extends State<MainLayout> {
     // Esta função permanece igual
     final profileController = Get.find<ProfileController>();
     if (profileController.currentProfile.value == null) {
-      // Usar Get.off em vez de Get.to pode ser melhor aqui para não empilhar a tela de login sobre o layout principal
       Get.off(() => const ProfileScreen(showBackButton: false));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: _screens),
-      bottomNavigationBar: BottomNavigationWidget(
-        currentIndex: _currentIndex,
-        onTap: _onTabTapped,
-      ),
-    );
+    final profileController = Get.find<ProfileController>();
+    
+    return Obx(() {
+      // Observa mudanças no perfil atual
+      final currentProfile = profileController.currentProfile.value;
+      
+      // Se não há perfil, vai para a tela de perfil
+      if (currentProfile == null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Get.off(() => const ProfileScreen(showBackButton: false));
+        });
+      }
+      
+      return Scaffold(
+        body: IndexedStack(index: _currentIndex, children: _screens),
+        bottomNavigationBar: currentProfile != null 
+          ? BottomNavigationWidget(
+              currentIndex: _currentIndex,
+              onTap: _onTabTapped,
+            )
+          : null,
+      );
+    });
   }
 }

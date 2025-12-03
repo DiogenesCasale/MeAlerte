@@ -14,19 +14,33 @@ class DatabaseController {
     return _database!;
   }
 
+  // --- Método para fechar o banco de dados ---
+  Future<void> close() async {
+    if (_database != null) {
+      await _database!.close();
+      _database = null;
+      print('Banco de dados fechado e resetado.');
+    }
+  }
+
   // --- Inicialização e criação das tabelas ---
   Future<Database> _initDB(String filePath) async {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
     return await openDatabase(
       path,
-      version: 4,
-      onCreate: _createDB,
+      version: 5,
+      onCreate: (db, version) async {
+        // 1. Cria o esquema da primeira versão
+        await _createDBSchemaV1(db);
+        // 2. Executa todas as migrações desde a v1 até a versão final
+        await _onUpgrade(db, 1, version);
+      },
       onUpgrade: _onUpgrade,
     );
   }
 
-  Future _createDB(Database db, int version) async {
+  Future _createDBSchemaV1(Database db) async {
     // Tabela de medicamentos
     await db.execute('''
       CREATE TABLE tblMedicamentos ( 
@@ -74,10 +88,9 @@ class DatabaseController {
         case 4:
           await _migrateToV4(db);
           break;
-        // Adicione novos 'cases' aqui para futuras versões.
-        // case 5:
-        //   await _migrateToV5(db);
-        //   break;
+        case 5:
+          await _migrateToV5(db);
+          break;
       }
     }
 
@@ -89,103 +102,251 @@ class DatabaseController {
 
     print("Migração da v1 para v2...");
 
-    // Alterações na tblMedicamentos
-    // NOTA: SQLite não permite renomear colunas em todas as versões.
-    // O comando 'RENAME COLUMN' é mais recente. A maneira mais segura seria criar uma
-    // nova tabela, copiar os dados e renomear, mas para simplicidade, usaremos o ALTER.
-    // Assumindo que a coluna se chamava 'quantidade' e agora é 'estoque'.
-    // Se sua tabela já tinha 'estoque', este comando não é necessário.
-    batch.execute(
-      'ALTER TABLE tblMedicamentos RENAME COLUMN quantidade TO estoque;',
+    // 1. Selecionar os dados existentes da tblMedicamentos
+    List<Map<String, dynamic>> dadosMedicamentos = await db.rawQuery(
+      'SELECT * FROM tblMedicamentos;',
     );
 
-    batch.execute(
-      "ALTER TABLE tblMedicamentos ADD COLUMN tipo TEXT NOT NULL DEFAULT 'comprimido';",
+    // 2. Dropar a tabela tblMedicamentos
+    batch.execute('DROP TABLE IF EXISTS tblMedicamentos;');
+
+    // 3. Recriar a tabela tblMedicamentos com a nova estrutura
+    batch.execute('''
+      CREATE TABLE tblMedicamentos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL,
+        estoque REAL NOT NULL DEFAULT 0,
+        tipo TEXT NOT NULL DEFAULT 'comprimido',
+        deletado INTEGER DEFAULT 0,
+        caminhoImagem TEXT NULL,
+        observacao TEXT,
+        dataCriacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        dataAtualizacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+      ''');
+
+    // 4. Transferir os dados para a nova tabela tblMedicamentos
+    if (dadosMedicamentos.isNotEmpty) {
+      print("Migrando dados de tblMedicamentos...");
+      for (var dadosMedicamento in dadosMedicamentos) {
+        // Mapear os dados da tabela antiga para a nova
+        // Campos da v1: id, nome, quantidade, observacao, data_criacao
+        // Campos da v2: id, nome, estoque, tipo, deletado, idPerfil, caminhoImagem, observacao, dataCriacao, dataAtualizacao
+        batch.execute(
+          '''
+      INSERT INTO tblMedicamentos (id, nome, estoque, tipo, deletado, caminhoImagem, observacao, dataCriacao, dataAtualizacao)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ''',
+          [
+            dadosMedicamento['id'], // Mantém o mesmo ID
+            dadosMedicamento['nome'],
+            dadosMedicamento['quantidade'] ??
+                0, // Mapeia quantidade para estoque
+            'comprimido', // Valor padrão para tipo
+            0, // Valor padrão para não deletado
+            null, // caminhoImagem não existe na v1, então null
+            dadosMedicamento['observacao'],
+            dadosMedicamento['data_criacao'] ??
+                '', // data_criacao mapeia para dataCriacao
+            dadosMedicamento['data_criacao'] ??
+                '', // Usa data_criacao como dataAtualizacao inicial
+          ],
+        );
+      }
+    }
+
+    // 5. Selecionar os dados existentes da tblMedicamentosAgendados
+    List<Map<String, dynamic>> dadosMedicamentosAgendados = await db.rawQuery(
+      'SELECT * FROM tblMedicamentosAgendados;',
     );
 
-    // Alterações na tblMedicamentosAgendados
-    batch.execute(
-      'ALTER TABLE tblMedicamentosAgendados ADD COLUMN data_inicio TEXT;',
-    );
-    batch.execute(
-      'ALTER TABLE tblMedicamentosAgendados ADD COLUMN data_fim TEXT;',
-    );
-    batch.execute(
-      'ALTER TABLE tblMedicamentosAgendados ADD COLUMN para_sempre INTEGER DEFAULT 0;',
-    );
-    batch.execute(
-      'ALTER TABLE tblMedicamentosAgendados ADD COLUMN deletado INTEGER DEFAULT 0;',
-    );
+    // 6. Dropar a tabela tblMedicamentosAgendados
+    batch.execute('DROP TABLE IF EXISTS tblMedicamentosAgendados;');
 
-    await batch.commit();
-    print("Migração v1 para v2 concluída com sucesso.");
+    // 7. Recriar a tabela tblMedicamentosAgendados com a nova estrutura
+    batch.execute('''
+      CREATE TABLE tblMedicamentosAgendados (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        hora TEXT NOT NULL,
+        dose REAL NOT NULL CHECK(dose > 0),
+        intervalo INTEGER NOT NULL,
+        dias INTEGER NOT NULL CHECK(dias >= 0),
+        deletado INTEGER DEFAULT 0,
+        observacao TEXT,
+        idMedicamento INTEGER NOT NULL,
+        dataInicio TEXT NULL,
+        dataFim TEXT NULL,
+        paraSempre INTEGER DEFAULT 0,
+        dataCriacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        dataAtualizacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (idMedicamento) REFERENCES tblMedicamentos (id) ON DELETE CASCADE
+      )
+      ''');
+
+    // 8. Transferir os dados para a nova tabela tblMedicamentosAgendados
+    if (dadosMedicamentosAgendados.isNotEmpty) {
+      print("Migrando dados de tblMedicamentosAgendados...");
+      for (var dadosMedicamentoAgendado in dadosMedicamentosAgendados) {
+        if (dadosMedicamentoAgendado['medicamento_id'] == null) {
+          print(
+            "⚠️ Aviso: Agendamento com ID ${dadosMedicamentoAgendado['id']} possui medicamento_id nulo. Pulando migração deste registro.",
+          );
+          continue; // Pula este registro
+        }
+
+        if (dadosMedicamentoAgendado['data_criacao'] == null) {
+          print(
+            "⚠️ Aviso: Agendamento com ID ${dadosMedicamentoAgendado['id']} possui data_criacao nulo. Pulando migração deste registro.",
+          );
+          continue; // Pula este registro
+        }
+
+        var dataFim =
+            dadosMedicamentoAgendado['dias'] != null &&
+                dadosMedicamentoAgendado['dias'] > 0
+            ? DateTime.parse(dadosMedicamentoAgendado['data_criacao'])
+                  .add(Duration(days: dadosMedicamentoAgendado['dias']))
+                  .toIso8601String()
+            : null;
+        batch.execute(
+          '''
+        INSERT INTO tblMedicamentosAgendados (id, hora, dose, intervalo, dias, deletado, observacao, idMedicamento, dataInicio, dataFim, paraSempre, dataCriacao, dataAtualizacao)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''',
+          [
+            dadosMedicamentoAgendado['id'],
+            dadosMedicamentoAgendado['hora'],
+            dadosMedicamentoAgendado['dose'],
+            dadosMedicamentoAgendado['intervalo'],
+            dadosMedicamentoAgendado['dias'],
+            0,
+            dadosMedicamentoAgendado['observacao'],
+            dadosMedicamentoAgendado['medicamento_id'],
+            dadosMedicamentoAgendado['data_criacao'],
+            dataFim,
+            0,
+            dadosMedicamentoAgendado['data_criacao'] ?? '',
+            dadosMedicamentoAgendado['data_criacao'] ?? '',
+          ],
+        );
+      }
+    }
+
+    // 9. Triggers para atualização das colunas dataAtualizacao
+    batch.execute('''
+        CREATE TRIGGER updateDataAtualizacaoMedicamentos
+        AFTER UPDATE ON tblMedicamentos
+        FOR EACH ROW
+        BEGIN
+          UPDATE tblMedicamentos
+          SET dataAtualizacao = CURRENT_TIMESTAMP
+          WHERE id = OLD.id;
+        END;
+      ''');
+
+    batch.execute('''
+        CREATE TRIGGER updateDataAtualizacaoAgendamentos
+        AFTER UPDATE ON tblMedicamentosAgendados
+        FOR EACH ROW
+        BEGIN
+          UPDATE tblMedicamentosAgendados
+          SET dataAtualizacao = CURRENT_TIMESTAMP
+          WHERE id = OLD.id;
+        END;
+      ''');
+
+    try {
+      await batch.commit();
+      print("Migração v1 para v2 concluída com sucesso.");
+    } catch (e) {
+      print("Erro na migração v1 para v2: $e");
+      rethrow;
+    }
   }
 
   Future<void> _migrateToV3(Database db) async {
     final batch = db.batch();
 
-    // Renomeia colunas para o padrão camelCase
-    batch.execute(
-      'ALTER TABLE tblMedicamentos RENAME COLUMN data_criacao TO dataCriacao;',
-    );
-    batch.execute(
-      'ALTER TABLE tblMedicamentosAgendados RENAME COLUMN data_criacao TO dataCriacao;',
-    );
-    batch.execute(
-      'ALTER TABLE tblMedicamentosAgendados RENAME COLUMN medicamento_id TO idMedicamento;',
-    );
-    batch.execute(
-      'ALTER TABLE tblMedicamentosAgendados RENAME COLUMN data_inicio TO dataInicio;',
-    );
-    batch.execute(
-      'ALTER TABLE tblMedicamentosAgendados RENAME COLUMN data_fim TO dataFim;',
-    );
-    batch.execute(
-      'ALTER TABLE tblMedicamentosAgendados RENAME COLUMN para_sempre TO paraSempre;',
-    );
-
-    // Adiciona novas colunas
-    batch.execute(
-      'ALTER TABLE tblMedicamentosAgendados ADD COLUMN dataAtualizacao TEXT;',
-    );
-    batch.execute(
-      'ALTER TABLE tblMedicamentos ADD COLUMN deletado INTEGER DEFAULT 0;',
-    );
-    batch.execute(
-      'ALTER TABLE tblMedicamentos ADD COLUMN caminhoImagem TEXT NULL;',
-    );
-    batch.execute(
-      'ALTER TABLE tblMedicamentos ADD COLUMN dataAtualizacao TEXT;',
-    );
-
     // Cria a nova tabela de perfil
     batch.execute('''
-    CREATE TABLE tblPerfil (
+      CREATE TABLE tblPerfil (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL,
+        dataNascimento TEXT NULL,
+        genero TEXT NULL,
+        caminhoImagem TEXT NULL,
+        deletado INTEGER DEFAULT 0,
+        dataCriacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        dataAtualizacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    ''');
+
+    // Cria a nova tabela de dados de saúde
+    batch.execute('''
+    CREATE TABLE tblDadosSaude (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      nome TEXT NOT NULL,
-      dataNascimento TEXT NULL,
-      genero TEXT NULL,
-      peso REAL NULL,
-      caminhoImagem TEXT NULL,
+      idPerfil INTEGER NOT NULL,
+      tipo TEXT NOT NULL,
+      valor REAL NULL,
+      valorSistolica REAL NULL,
+      valorDiastolica REAL NULL,
+      unidade TEXT NULL,
+      observacao TEXT NULL,
+      dataRegistro TEXT NOT NULL,
       deletado INTEGER DEFAULT 0,
       dataCriacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      dataAtualizacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      dataAtualizacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (idPerfil) REFERENCES tblPerfil (id) ON DELETE CASCADE
     )
-  ''');
+    ''');
 
-    // Adiciona a referência de perfil às tabelas existentes
-    batch.execute(
-      'ALTER TABLE tblMedicamentos ADD COLUMN idPerfil INTEGER NOT NULL DEFAULT 1;',
-    );
-    batch.execute(
-      'ALTER TABLE tblMedicamentosAgendados ADD COLUMN idPerfil INTEGER NOT NULL DEFAULT 1;',
-    );
+    // Adiciona chaves estrangeiras para idPerfil em tblMedicamentos e tblMedicamentosAgendados
+    // 1. Altera a tabela tblMedicamentos
+    batch.execute('''
+      ALTER TABLE tblMedicamentos
+      ADD COLUMN idPerfil INTEGER NOT NULL DEFAULT 1
+      REFERENCES tblPerfil(id) ON DELETE CASCADE
+    ''');
 
-    await batch.commit();
-    print("Migração para v3 concluída.");
+    // 2. Altera a tabela tblMedicamentosAgendados
+    batch.execute('''
+      ALTER TABLE tblMedicamentosAgendados
+      ADD COLUMN idPerfil INTEGER NOT NULL DEFAULT 1
+      REFERENCES tblPerfil(id) ON DELETE CASCADE
+    ''');
+
+    // Triggers para atualização das colunas dataAtualizacao
+    batch.execute('''
+      CREATE TRIGGER updateDataAtualizacaoPerfil
+      AFTER UPDATE ON tblPerfil
+      FOR EACH ROW
+      BEGIN
+        UPDATE tblPerfil
+        SET dataAtualizacao = CURRENT_TIMESTAMP
+        WHERE id = OLD.id;
+      END;
+    ''');
+
+    batch.execute('''
+      CREATE TRIGGER updateDataAtualizacaoDadosSaude
+      AFTER UPDATE ON tblDadosSaude
+      FOR EACH ROW
+      BEGIN
+        UPDATE tblDadosSaude
+        SET dataAtualizacao = CURRENT_TIMESTAMP
+        WHERE id = OLD.id;
+      END;
+    ''');
+
+    try {
+      await batch.commit();
+      print("Migração v2 para v3 concluída com sucesso.");
+    } catch (e) {
+      print("Erro na migração v2 para v3: $e");
+      rethrow;
+    }
   }
 
-  /// Migração da v3 para v4: Adiciona a tabela para controle de doses tomadas.
   Future<void> _migrateToV4(Database db) async {
     final batch = db.batch();
 
@@ -194,85 +355,119 @@ class DatabaseController {
     CREATE TABLE tblDosesTomadas (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       idAgendamento INTEGER NOT NULL,
+      idPerfil INTEGER NOT NULL DEFAULT 1,
       dataTomada TEXT NOT NULL,
       horarioTomada TEXT NOT NULL,
       horarioAgendado TEXT NOT NULL,
-      idPerfil INTEGER NOT NULL,
       observacao TEXT,
       deletado INTEGER DEFAULT 0,
       dataCriacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       dataAtualizacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (idAgendamento) REFERENCES tblMedicamentosAgendados (id) ON DELETE CASCADE
+      FOREIGN KEY (idAgendamento) REFERENCES tblMedicamentosAgendados (id) ON DELETE CASCADE,
+      FOREIGN KEY (idPerfil) REFERENCES tblPerfil (id) ON DELETE CASCADE
     )
   ''');
 
-    await batch.commit();
-    print("Migração para v4 concluída.");
+    // Cria o trigger para atualização da coluna dataAtualizacao
+    batch.execute('''
+      CREATE TRIGGER updateDataAtualizacaoDosesTomadas
+      AFTER UPDATE ON tblDosesTomadas
+      FOR EACH ROW
+      BEGIN
+        UPDATE tblDosesTomadas
+        SET dataAtualizacao = CURRENT_TIMESTAMP
+        WHERE id = OLD.id;
+      END;
+    ''');
+
+    try {
+      await batch.commit();
+      print("Migração v3 para v4 concluída com sucesso.");
+    } catch (e) {
+      print("Erro na migração v3 para v4: $e");
+      rethrow;
+    }
   }
 
-  // METODO DE DEBUG DOS CAMPOS DA TABELA
-  Future<void> _inspectTable(Database db, String tableName) async {
-    print("\n--- Inspecionando a tabela: '$tableName' ---");
+  Future<void> _migrateToV5(Database db) async {
+    final batch = db.batch();
+    // INCREMENTO 3 DO PROJETO
+
+    // Adiciona a coluna perfilPadrao para a tabela tblPerfil
+    batch.execute('''
+      ALTER TABLE tblPerfil ADD COLUMN perfilPadrao INTEGER NOT NULL DEFAULT 0;
+    ''');
+
+    // Adiciona a coluna mensagemCompartilhar para a tabela tblPerfil
+    batch.execute('''
+      ALTER TABLE tblPerfil ADD COLUMN mensagemCompartilhar TEXT NOT NULL DEFAULT '';
+    ''');
+
+    batch.execute('''
+      CREATE TABLE tblEstoqueMedicamento (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        idMedicamento INTEGER NOT NULL,
+        idPerfil INTEGER NOT NULL DEFAULT 1,
+        idDoseTomada INTEGER NULL,
+        tipo TEXT NOT NULL,
+        quantidade REAL NOT NULL,
+        observacao TEXT NULL,
+        deletado INTEGER DEFAULT 0,
+        dataCriacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (idMedicamento) REFERENCES tblMedicamentos (id) ON DELETE CASCADE,
+        FOREIGN KEY (idPerfil) REFERENCES tblPerfil (id) ON DELETE CASCADE
+      )
+    ''');
+
+    batch.execute('''
+        CREATE TABLE tblNotificacoes (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          idPerfil INTEGER NOT NULL DEFAULT 1,
+          idAgendamento INTEGER,
+          horarioAgendado TEXT,
+          titulo TEXT NOT NULL,
+          mensagem TEXT NOT NULL,
+          lida INTEGER DEFAULT 0,
+          deletado INTEGER DEFAULT 0,
+          dataCriacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (idPerfil) REFERENCES tblPerfil (id) ON DELETE CASCADE,
+          FOREIGN KEY (idAgendamento) REFERENCES tblMedicamentosAgendados (id) ON DELETE CASCADE
+          )
+      ''');
+
+    batch.execute('''
+        CREATE TABLE tblAnotacoes (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          idPerfil INTEGER NOT NULL DEFAULT 1,
+          anotacao TEXT NOT NULL,
+          deletado INTEGER DEFAULT 0,
+          dataCriacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          dataAtualizacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (idPerfil) REFERENCES tblPerfil (id) ON DELETE CASCADE
+          )
+      ''');
+
+    batch.execute('''
+        CREATE TRIGGER updateDataAtualizacaoAnotacoes
+        AFTER UPDATE ON tblAnotacoes
+        FOR EACH ROW
+        BEGIN
+          UPDATE tblAnotacoes
+          SET dataAtualizacao = CURRENT_TIMESTAMP
+          WHERE id = OLD.id;
+        END;
+      ''');
+
+    batch.execute('''
+          ALTER TABLE tblMedicamentosAgendados ADD COLUMN idAgendamentoPai INTEGER NULL;
+        ''');
+
     try {
-      // 1. Verifica a ESTRUTURA (colunas)
-      final tableInfo = await db.rawQuery('PRAGMA table_info($tableName);');
-      print("Estrutura (Colunas):");
-      if (tableInfo.isEmpty) {
-        print("  (A tabela não existe ou não tem colunas)");
-      } else {
-        for (var column in tableInfo) {
-          print(
-            "  - Nome: ${column['name']}, Tipo: ${column['type']}, Nulo: ${column['notnull'] == 0}",
-          );
-        }
-      }
-
-      // 2. Verifica os DADOS (as 5 primeiras linhas)
-      final sampleData = await db.query(tableName, limit: 5);
-      print("\nAmostra de Dados (até 5 linhas):");
-      if (sampleData.isEmpty) {
-        print("  (A tabela está vazia)");
-      } else {
-        for (var row in sampleData) {
-          print("  - $row");
-        }
-      }
+      await batch.commit();
+      print("Migração v4 para v5 concluída com sucesso.");
     } catch (e) {
-      print("  Erro ao inspecionar a tabela '$tableName': $e");
+      print("Erro na migração v4 para v5: $e");
+      rethrow;
     }
-    print("--- Fim da inspeção de '$tableName' ---\n");
-  }
-
-  // METODO DE DEBUG DOS DADOS DA TABELA
-  Future<void> debugPrintTableData(Database db, String tableName) async {
-    print("\n--- 🕵️  [DEBUG] Conteúdo da Tabela: '$tableName' 🕵️ ---");
-    try {
-      // 1. Executa a query para buscar todos os dados
-      final List<Map<String, dynamic>> results = await db.query(tableName);
-
-      // 2. Verifica se a tabela está vazia
-      if (results.isEmpty) {
-        print("|| A tabela está vazia ou não existe. ||");
-        print("--- Fim do conteúdo de '$tableName' ---\n");
-        return;
-      }
-
-      // 3. Monta e imprime o cabeçalho com os nomes das colunas
-      final columns = results.first.keys;
-      final header = columns.map((col) => col.padRight(15)).join(' | ');
-      print(header);
-      print('-' * header.length); // Linha separadora
-
-      // 4. Itera sobre cada linha e imprime os dados
-      for (final row in results) {
-        final rowValues = columns
-            .map((col) => (row[col]?.toString() ?? 'NULL').padRight(15))
-            .join(' | ');
-        print(rowValues);
-      }
-    } catch (e) {
-      print("🚨 Erro ao ler a tabela '$tableName': $e");
-    }
-    print("--- Fim do conteúdo de '$tableName' ---\n");
   }
 }

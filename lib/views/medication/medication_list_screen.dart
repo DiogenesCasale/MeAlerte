@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:app_remedio/views/medication/add_restock_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:app_remedio/controllers/medication_controller.dart';
@@ -43,7 +44,7 @@ class MedicationListScreen extends GetView<MedicationController> {
       body: Column(
         children: [
           if (!showAppBar) ...[
-            const AppHeaderWidget(), // Mantido
+            AppHeaderWidget(), // Remove const para permitir rebuilds
           ],
           // Barra de pesquisa
           Padding(
@@ -169,7 +170,13 @@ class MedicationListScreen extends GetView<MedicationController> {
             ),
             icon: Icon(Icons.medication, color: Colors.white),
             label: 'Novo Medicamento',
-            backgroundColor: Colors.blue,
+            backgroundColor: primaryColor,
+          ),
+          ActionButtonModel(
+            onPressed: () => Get.to(() => const AddRestockScreen()),
+            icon: Icon(Icons.add, color: Colors.white),
+            label: 'Nova Reposição/Saída',
+            backgroundColor: primaryColor,
           ),
         ],
       ),
@@ -272,7 +279,7 @@ class MedicationListScreen extends GetView<MedicationController> {
         ),
       );
     }
-
+    String stockText = medication.estoque.toString().replaceAll('.', ',');
     // ALTERADO: O corpo do widget agora usa o `leadingWidget` que criamos
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4.0),
@@ -303,8 +310,9 @@ class MedicationListScreen extends GetView<MedicationController> {
                       ),
                     ),
                     const SizedBox(height: 4),
+         
                     Text(
-                      'Estoque: ${medication.estoque} ${medication.tipo.unit}',
+                      'Estoque: $stockText ${medication.tipo.unit}',
                       style: TextStyle(
                         fontSize: 14,
                         color: medication.estoque > 10
@@ -383,14 +391,7 @@ class MedicationListScreen extends GetView<MedicationController> {
   }
 
   IconData _getMedicationIcon(MedicationType type) {
-    switch (type) {
-      case MedicationType.comprimido:
-        return Icons.medication;
-      case MedicationType.liquido:
-        return Icons.water_drop_outlined;
-      case MedicationType.injecao:
-        return Icons.colorize;
-    }
+    return type.icon;
   }
 
   void _clearSearch() {
@@ -413,12 +414,52 @@ class MedicationListScreen extends GetView<MedicationController> {
             child: Text('Cancelar', style: TextStyle(color: textColor)),
           ),
           ElevatedButton(
-            onPressed: () {
-              Get.back();
-              ToastService.showInfo(
-                Get.context!,
-                'Exclusão será implementada em breve',
-              );
+            onPressed: () async {
+              Get.back(); // Fechar o dialog primeiro
+              
+              try {
+                final result = await controller.deleteMedication(medication.id!);
+                
+                // Usar Get.overlayContext para evitar erro de overlay
+                final overlayContext = Get.overlayContext;
+                if (overlayContext != null) {
+                  if (result == 0) {
+                    ToastService.showSuccess(
+                      overlayContext,
+                      'Medicamento excluído com sucesso',
+                    );
+                  } else if (result == 1) {
+                    ToastService.showError(
+                      overlayContext,
+                      'Não é possível excluir este medicamento pois existem agendamentos vinculados a ele. Exclua ou finalize os agendamentos primeiro.',
+                    );
+                  } else {
+                    ToastService.showError(
+                      overlayContext,
+                      'Não foi possível excluir o medicamento.',
+                    );
+                  }
+                } else {
+                  // Fallback usando Get.snackbar se não houver overlay context
+                  if (result == 0) {
+                    Get.snackbar('Sucesso', 'Medicamento excluído com sucesso');
+                  } else if (result == 1) {
+                    Get.snackbar('Erro', 'Não é possível excluir este medicamento pois existem agendamentos vinculados a ele.');
+                  } else {
+                    Get.snackbar('Erro', 'Não foi possível excluir o medicamento.');
+                  }
+                }
+              } catch (e) {
+                final overlayContext = Get.overlayContext;
+                if (overlayContext != null) {
+                  ToastService.showError(
+                    overlayContext,
+                    'Erro ao excluir medicamento!',
+                  );
+                } else {
+                  Get.snackbar('Erro', 'Erro ao excluir medicamento!');
+                }
+              }
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Excluir', style: TextStyle(color: Colors.white)),

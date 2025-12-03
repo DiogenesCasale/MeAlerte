@@ -118,11 +118,11 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
       ToastService.showError(context, 'É necessário selecionar um perfil primeiro.');
       return;
     }
-
+    final stockText = _stockController.text.trim().replaceAll(',', '.');
     try {
       final newMedication = Medication(
         nome: _nameController.text.trim(),
-        estoque: int.parse(_stockController.text.trim()),
+        estoque: double.parse(stockText),
         observacao: _observacaoController.text.trim().isEmpty 
           ? null 
           : _observacaoController.text.trim(),
@@ -251,7 +251,7 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Tipo *', style: heading2Style),
+              Text('Tipo do Medicamento *', style: heading2Style),
               const SizedBox(height: 8),
               DropdownButtonFormField<MedicationType>(
                 value: _selectedType,
@@ -282,10 +282,11 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
             label: 'Estoque *',
             hint: 'Ex: 30',
             keyboardType: TextInputType.number,
-            suffixText: _selectedType.unit,
             validator: (v) {
               if (v == null || v.trim().isEmpty) return 'Obrigatório';
-              final stock = int.tryParse(v);
+
+              final stockValue = v.trim().replaceAll(',', '.');
+              final stock = double.tryParse(stockValue);
               if (stock == null || stock < 0) return 'Inválido';
               return null;
             },

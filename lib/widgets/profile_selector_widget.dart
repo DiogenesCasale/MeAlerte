@@ -86,6 +86,7 @@ class ProfileSelectorWidget extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             ProfileImageWidget(
+              key: ValueKey('selector_image_${currentProfile.id}_${currentProfile.caminhoImagem}'),
               imagePath: currentProfile.caminhoImagem,
               size: imageSize,
               showBorder: false,
