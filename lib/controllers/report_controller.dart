@@ -6,12 +6,9 @@ import 'package:app_remedio/controllers/database_controller.dart';
 import 'package:app_remedio/controllers/profile_controller.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-
 import 'package:path_provider/path_provider.dart';
 import 'package:csv/csv.dart';
-
 import 'package:app_remedio/utils/toast_service.dart';
-import 'package:flutter/material.dart'; // Para Colors e Icons
 import 'package:flutter/services.dart' show rootBundle;
 
 enum ReportPeriod { lastWeek, lastMonth, last3Months, custom }

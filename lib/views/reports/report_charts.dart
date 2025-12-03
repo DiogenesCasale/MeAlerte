@@ -149,7 +149,28 @@ class DailyTrendBarChart extends StatelessWidget {
                 ),
               ),
               leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              topTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 30,
+                  getTitlesWidget: (value, meta) {
+                    final index = value.toInt();
+                    if (index < 0 || index >= trend.length) {
+                      return const SizedBox.shrink();
+                    }
+                    return Center(
+                      child: Text(
+                        trend[index].toStringAsFixed(0),
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
               rightTitles: AxisTitles(
                 sideTitles: SideTitles(showTitles: false),
               ),
@@ -205,10 +226,58 @@ class CriticalTimeCard extends StatelessWidget {
         critical = 'Noite';
       }
 
-      if (max == 0) return const SizedBox.shrink();
+      if (max == 0) {
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.green.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.green.withOpacity(0.3), width: 1),
+          ),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.emoji_events, color: Colors.green, size: 24),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Horário Crítico',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Colors.green,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Parabéns!',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green.shade400,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Você não esqueceu nenhuma dose neste período.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.green.withOpacity(0.8),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
 
       return Card(
         elevation: 2,
+        margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
